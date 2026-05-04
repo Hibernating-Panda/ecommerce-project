@@ -75,7 +75,7 @@ const RegisterPage = () => {
         formData.password
       );
       login(response.user, response.token);
-      navigate('/dashboard');
+      navigate('/home');;
     } catch (error) {
       if (error.errors) {
         // Laravel validation errors

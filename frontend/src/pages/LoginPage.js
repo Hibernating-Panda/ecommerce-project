@@ -36,7 +36,7 @@ const LoginPage = () => {
     try {
       const response = await authService.login(formData.email, formData.password);
       login(response.user, response.token);
-      navigate('/dashboard');
+      navigate('/home');;
     } catch (error) {
       setErrors({
         general: error.message || 'Login failed. Please try again.'
