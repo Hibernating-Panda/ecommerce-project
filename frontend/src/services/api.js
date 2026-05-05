@@ -1,34 +1,43 @@
-import axios from 'axios';
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: 'http://localhost:8001/api',
-  // baseURL: 'https://localhost:8000/api',
+  baseURL: "http://127.0.0.1:8000/api",
 });
 
-// Add authentication header to requests
+// Add authentication header to every request
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Handle 401 responses (unauthorized)
+// Handle unauthorized responses
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid, clear local storage and redirect to login
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+    const isLoginRequest = error.config?.url?.includes("/login");
+    const isRegisterRequest = error.config?.url?.includes("/register");
+
+    if (
+      error.response?.status === 401 &&
+      !isLoginRequest &&
+      !isRegisterRequest
+    ) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
     }
+
     return Promise.reject(error);
   }
 );
