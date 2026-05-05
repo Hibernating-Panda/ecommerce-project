@@ -1,5 +1,34 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import img_WirelessEarbud from "../image/Wireless_Earbud.png";
+import img_SmartWatch from "../image/Smart_Watch.png";
+import img_RunningShoes from "../image/Running_Shoses.png";
+import img_LaptopStand from "../image/Laptop_Stand.png";
+import img_PhoneCase from "../image/Phone_Case.png";
+import img_SunGlasses from "../image/SunGlasses.png";
+import img_YogaMat from "../image/Yoga_Mat.png";
+import img_CoffeeMaker from "../image/Coffee_Maker.png";
+import img_Backpack from "../image/Backpack.png";
+import img_DeskLamp from "../image/Desk_Lamp.png";
+import img_Keyboard from "../image/Keyboard.png";
+import img_MousePad from "../image/Mouse_Pad.png";
+import img_WaterBottle from "../image/Water_Bottle.png";
+import img_Hoodie from "../image/Hoddie.png";
+import img_Sneakers from "../image/Sneakers.png";
+import img_TabletCover from "../image/Table_Cover.png";
+import img_CableOrganizer from "../image/Table_Orgainzer.png";
+import img_Wallet from "../image/Wallet.png";
+import img_Belt from "../image/Belt.png";
+import img_Cap from "../image/Cap.png";
+import img_UsbHub from "../image/Usb_Hub.png";
+import img_Webcam from "../image/Webcam.png";
+import img_DeskChair from "../image/Desk_Chair.png";
+import img_Monitor from "../image/Monitor.png";
+import img_Headphone from "../image/Headphone.png";
+import img_Speaker from "../image/Speaker.png";
+import img_PowerBank from "../image/Power_bank.png";
+import img_CameraLens from "../image/Camera_Lens.png";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -40,29 +69,29 @@ const HERO_SLIDES = [
 ];
 
 const SIDEBAR_CATEGORIES = [
-  { icon: "📱", label: "Phones & Tablets" },
-  { icon: "💻", label: "Computers" },
-  { icon: "👗", label: "Fashion" },
-  { icon: "🏠", label: "Home & Living" },
-  { icon: "⚽", label: "Sports" },
-  { icon: "💊", label: "Health & Beauty" },
-  { icon: "🎮", label: "Gaming" },
-  { icon: "📚", label: "Books" },
-  { icon: "🚗", label: "Automotive" },
-  { icon: "🌱", label: "Garden" },
+  { icon: "📱", label: "Phones & Tablets",  route: "/category/phones" },
+  { icon: "💻", label: "Computers",         route: "/category/computers" },
+  { icon: "👗", label: "Fashion",           route: "/category/fashion" },
+  { icon: "🏠", label: "Home & Living",     route: "/category/home-living" },
+  { icon: "⚽", label: "Sports",            route: "/category/sports" },
+  { icon: "💊", label: "Health & Beauty",   route: "/category/health-beauty" },
+  { icon: "🎮", label: "Gaming",            route: "/category/gaming" },
+  { icon: "📚", label: "Books",             route: "/category/books" },
+  { icon: "🚗", label: "Automotive",        route: "/category/automotive" },
+  { icon: "🌱", label: "Garden",            route: "/category/garden" },
 ];
 
 const QUICK_CATS = [
-  { icon: "📱", label: "Phones" },
-  { icon: "👟", label: "Shoes" },
-  { icon: "💄", label: "Beauty" },
-  { icon: "🏡", label: "Home" },
-  { icon: "⌚", label: "Watches" },
-  { icon: "🎒", label: "Bags" },
-  { icon: "🖥️", label: "Computers" },
-  { icon: "📷", label: "Cameras" },
-  { icon: "🎧", label: "Audio" },
-  { icon: "🍳", label: "Kitchen" },
+  { icon: "📱", label: "Phones",    route: "/category/phones" },
+  { icon: "👟", label: "Shoes",     route: "/category/fashion" },
+  { icon: "💄", label: "Beauty",    route: "/category/health-beauty" },
+  { icon: "🏡", label: "Home",      route: "/category/home-living" },
+  { icon: "⌚", label: "Watches",   route: "/category/phones" },
+  { icon: "🎒", label: "Bags",      route: "/category/fashion" },
+  { icon: "🖥️", label: "Computers", route: "/category/computers" },
+  { icon: "📷", label: "Cameras",   route: "/category/phones" },
+  { icon: "🎧", label: "Audio",     route: "/category/phones" },
+  { icon: "🍳", label: "Kitchen",   route: "/category/home-living" },
 ];
 
 const BRANDS = [
@@ -87,8 +116,48 @@ const PARTNER_STORES = [
   { logo: "💳", name: "PayMall", discount: "Pay later, 0% interest", color: "#f0fff4" },
 ];
 
-const PRODUCT_ICONS = ["📱","⌚","👟","💻","📦","🕶️","🧘","☕","🎒","💡","⌨️","🖱️","💧","👕","👟","📱","🔌","👜","👔","🧢","🔌","📷","🪑","🖥️","🎧","🔊","🔋","📷","📷","💾"];
-const PRODUCT_NAMES = ["Wireless Earbuds","Smart Watch","Running Shoes","Laptop Stand","Phone Case","Sunglasses","Yoga Mat","Coffee Maker","Backpack","Desk Lamp","Keyboard","Mouse Pad","Water Bottle","Hoodie","Sneakers","Tablet Cover","Cable Organizer","Wallet","Belt","Cap","USB Hub","Webcam","Desk Chair","Monitor","Headphones","Speaker","Power Bank","Camera Lens","Tripod","Flash Drive"];
+// ─── Product Images mapped to your /src/image/ folder ────────────────────────
+const PRODUCT_IMAGES = [
+  img_WirelessEarbud,
+  img_SmartWatch,
+  img_RunningShoes,
+  img_LaptopStand,
+  img_PhoneCase,
+  img_SunGlasses,
+  img_YogaMat,
+  img_CoffeeMaker,
+  img_Backpack,
+  img_DeskLamp,
+  img_Keyboard,
+  img_MousePad,
+  img_WaterBottle,
+  img_Hoodie,
+  img_Sneakers,
+  img_TabletCover,
+  img_CableOrganizer,
+  img_Wallet,
+  img_Belt,
+  img_Cap,
+  img_UsbHub,
+  img_Webcam,
+  img_DeskChair,
+  img_Monitor,
+  img_Headphone,
+  img_Speaker,
+  img_PowerBank,
+  img_CameraLens,
+  img_CameraLens,  // Tripod placeholder
+  img_Keyboard,    // Flash Drive placeholder
+];
+
+const PRODUCT_NAMES = [
+  "Wireless Earbuds","Smart Watch","Running Shoes","Laptop Stand","Phone Case",
+  "Sunglasses","Yoga Mat","Coffee Maker","Backpack","Desk Lamp",
+  "Keyboard","Mouse Pad","Water Bottle","Hoodie","Sneakers",
+  "Tablet Cover","Cable Organizer","Wallet","Belt","Cap",
+  "USB Hub","Webcam","Desk Chair","Monitor","Headphones",
+  "Speaker","Power Bank","Camera Lens","Tripod","Flash Drive"
+];
 
 const ALL_PRODUCTS = Array.from({ length: 30 }, (_, i) => ({
   id: i + 1,
@@ -97,7 +166,7 @@ const ALL_PRODUCTS = Array.from({ length: 30 }, (_, i) => ({
   originalPrice: (Math.random() * 300 + 50).toFixed(2),
   rating: (3.5 + Math.random() * 1.5).toFixed(1),
   sold: Math.floor(Math.random() * 5000) + 100,
-  img: PRODUCT_ICONS[i],
+  img: PRODUCT_IMAGES[i],
 }));
 
 // ─── Sub-Components ───────────────────────────────────────────────────────────
@@ -164,8 +233,13 @@ function ProductCard({ product, compact, onClick }) {
         onMouseLeave={() => setHovered(false)}
         style={{ background: COLORS.white, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: 8, cursor: "pointer", boxShadow: hovered ? "0 2px 10px rgba(0,0,0,0.08)" : "none", transition: "box-shadow 0.2s" }}
       >
-        <div style={{ width: "100%", aspectRatio: "1", background: `hsl(${hue},50%,94%)`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, marginBottom: 6 }}>
-          {product.img}
+        <div style={{ width: "100%", aspectRatio: "1", background: `hsl(${hue},50%,94%)`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 6, overflow: "hidden" }}>
+          <img
+            src={product.img}
+            alt={product.name}
+            style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 6 }}
+            onError={(e) => { e.target.style.display = "none"; }}
+          />
         </div>
         <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 3, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{product.name}</div>
         <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>${product.price}</div>
@@ -181,8 +255,13 @@ function ProductCard({ product, compact, onClick }) {
       onMouseLeave={() => setHovered(false)}
       style={{ background: COLORS.white, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: 10, cursor: "pointer", boxShadow: hovered ? "0 2px 10px rgba(0,0,0,0.08)" : "none", transition: "box-shadow 0.2s" }}
     >
-      <div style={{ width: "100%", aspectRatio: "1", background: `hsl(${hue},50%,94%)`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, marginBottom: 8, position: "relative" }}>
-        {product.img}
+      <div style={{ width: "100%", aspectRatio: "1", background: `hsl(${hue},50%,94%)`, borderRadius: 6, marginBottom: 8, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <img
+          src={product.img}
+          alt={product.name}
+          style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 6 }}
+          onError={(e) => { e.target.style.display = "none"; }}
+        />
         <span style={{ position: "absolute", top: 5, left: 5, background: COLORS.primary, color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 3 }}>
           -{disc}%
         </span>
@@ -199,8 +278,9 @@ function ProductCard({ product, compact, onClick }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function HomePage({ onNavigate, onProductClick }) {
-  const [activeCategory, setActiveCategory] = useState(0);
+export default function HomePage() {
+  const [activeCategory, setActiveCategory] = useState(null);
+  const navigate = useNavigate();
 
   return (
     <div style={{ background: "#f5f5f5", minHeight: "100vh" }}>
@@ -208,7 +288,7 @@ export default function HomePage({ onNavigate, onProductClick }) {
       {/* Navbar */}
       <Navbar />
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "14px 20px" }}>
+      <div style={{ maxWidth: 1700, margin: "0 auto", padding: "14px 20px" }}>
 
         {/* Above the fold: sidebar + hero + brands */}
         <div style={{ display: "grid", gridTemplateColumns: "190px 1fr 175px", gap: 12, marginBottom: 14 }}>
@@ -221,7 +301,7 @@ export default function HomePage({ onNavigate, onProductClick }) {
             {SIDEBAR_CATEGORIES.map((cat, i) => (
               <div
                 key={i}
-                onClick={() => { setActiveCategory(i); onNavigate && onNavigate("category"); }}
+                onClick={() => { setActiveCategory(i); navigate(cat.route); }}
                 style={{ padding: "9px 14px", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, background: activeCategory === i ? "#FFF0F1" : "transparent", color: activeCategory === i ? COLORS.primary : COLORS.text, fontWeight: activeCategory === i ? 700 : 400, borderLeft: activeCategory === i ? `3px solid ${COLORS.primary}` : "3px solid transparent", transition: "all 0.15s" }}
               >
                 <span style={{ fontSize: 14 }}>{cat.icon}</span>
@@ -258,7 +338,7 @@ export default function HomePage({ onNavigate, onProductClick }) {
             {QUICK_CATS.map((cat, i) => (
               <div
                 key={i}
-                onClick={() => onNavigate && onNavigate("category")}
+                onClick={() => navigate(cat.route)}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#FFF0F1")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, cursor: "pointer", padding: "5px 14px", minWidth: 76, borderRadius: 8 }}
@@ -336,20 +416,20 @@ export default function HomePage({ onNavigate, onProductClick }) {
 
         {/* Recommended */}
         <div style={{ marginBottom: 28 }}>
-          <SectionTitle title="You Might Want to Buy" onLink={() => onNavigate && onNavigate("category")} />
+          <SectionTitle title="You Might Want to Buy" onLink={() => navigate("/category/phones")} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 10 }}>
             {ALL_PRODUCTS.slice(0, 8).map((p) => (
-              <ProductCard key={p.id} product={p} compact onClick={onProductClick} />
+              <ProductCard key={p.id} product={p} compact />
             ))}
           </div>
         </div>
 
         {/* Trending */}
         <div style={{ marginBottom: 28 }}>
-          <SectionTitle title="Trending Now" onLink={() => onNavigate && onNavigate("category")} />
+          <SectionTitle title="Trending Now" onLink={() => navigate("/category/phones")} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14 }}>
             {ALL_PRODUCTS.slice(8, 18).map((p) => (
-              <ProductCard key={p.id} product={p} onClick={onProductClick} />
+              <ProductCard key={p.id} product={p} />
             ))}
           </div>
         </div>
@@ -376,10 +456,10 @@ export default function HomePage({ onNavigate, onProductClick }) {
 
         {/* More Products */}
         <div style={{ marginBottom: 28 }}>
-          <SectionTitle title="More Products" onLink={() => onNavigate && onNavigate("category")} />
+          <SectionTitle title="More Products" onLink={() => navigate("/category/phones")} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14 }}>
             {ALL_PRODUCTS.slice(18, 28).map((p) => (
-              <ProductCard key={p.id} product={p} onClick={onProductClick} />
+              <ProductCard key={p.id} product={p} />
             ))}
           </div>
         </div>
