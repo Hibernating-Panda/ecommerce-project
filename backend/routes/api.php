@@ -8,6 +8,7 @@ use App\Http\Controllers\API\Admin\AdminDashboardController;
 use App\Http\Controllers\API\Admin\AdminUserController;
 use App\Http\Controllers\API\Admin\AdminProductController;
 use App\Http\Controllers\API\Admin\AdminCategoryController;
+use App\Http\Controllers\API\Admin\AdminProfileController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -28,6 +29,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 
     Route::apiResource('/users', AdminUserController::class);
+    Route::patch('/users/{user}/approve', [AdminUserController::class, 'approve']);
+    Route::patch('/users/{user}/reject', [AdminUserController::class, 'reject']);
 
     Route::get('/products', [AdminProductController::class, 'index']);
     Route::post('/products', [AdminProductController::class, 'store']);
@@ -37,5 +40,9 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::delete('/products/{product}', [AdminProductController::class, 'destroy']);
     
     Route::apiResource('/categories', AdminCategoryController::class);
+
+    Route::get('/profile', [AdminProfileController::class, 'show']);
+    Route::put('/profile', [AdminProfileController::class, 'update']);
+    
 });
 

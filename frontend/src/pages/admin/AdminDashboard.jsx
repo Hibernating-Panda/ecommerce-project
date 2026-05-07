@@ -59,6 +59,9 @@ function AdminDashboard() {
       { name: "Customers", value: stats.total_customers || 0 },
       { name: "Delivery", value: stats.total_delivery_men || 0 },
       { name: "Shops", value: stats.total_shop_owners || 0 },
+      { name: "Pending", value: stats.pending_accounts || 0 },
+      { name: "Active", value: stats.active_accounts || 0 },
+      { name: "Rejected", value: stats.rejected_accounts || 0 },
     ];
   }, [stats]);
 
@@ -69,6 +72,9 @@ function AdminDashboard() {
     "#22c55e", // Customers
     "#ef4444", // Delivery
     "#f59e0b", // Shops
+    "#f97316", // Pending
+    "#16a34a", // Active
+    "#dc2626", // Rejected
   ];
 
   const COLORS = ["#4f46e5", "#22c55e", "#f59e0b", "#ef4444"];
@@ -122,6 +128,9 @@ function AdminDashboard() {
         <StatCard title="Delivery Men" value={stats.total_delivery_men} icon="🚚" />
         <StatCard title="Admins" value={stats.total_admins} icon="🛡️" />
         <StatCard title="Products" value={stats.total_products} icon="📦" />
+        <StatCard title="Pending Accounts" value={stats.pending_accounts} icon="⏳" />
+        <StatCard title="Active Accounts" value={stats.active_accounts} icon="✅" />
+        <StatCard title="Rejected Accounts" value={stats.rejected_accounts} icon="❌" />
       </div>
 
       {/* Charts */}
@@ -187,6 +196,9 @@ function AdminDashboard() {
             <li>Total shop owners: <strong>{stats.total_shop_owners}</strong></li>
             <li>Total delivery men: <strong>{stats.total_delivery_men}</strong></li>
             <li>Total products in system: <strong>{stats.total_products}</strong></li>
+            <li>Pending accounts: <strong>{stats.pending_accounts}</strong></li>
+            <li>Active accounts: <strong>{stats.active_accounts}</strong></li>
+            <li>Rejected accounts: <strong>{stats.rejected_accounts}</strong></li>
           </ul>
         </div>
 
@@ -196,6 +208,7 @@ function AdminDashboard() {
           <div style={styles.noteBox}> Review newly added products</div>
           <div style={styles.noteBox}> Manage categories and permissions</div>
           <div style={styles.noteBox}> Keep track of shop owner accounts</div>
+          <div style={styles.noteBox}> Manage pending accounts</div>
         </div>
       </div>
     </div>

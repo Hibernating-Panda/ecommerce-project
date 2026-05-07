@@ -48,16 +48,32 @@ export default function AdminLayout() {
             </div>
           </div>
 
-          <div style={styles.userBox}>
+          <NavLink
+            to="/admin/profile"
+            style={({ isActive }) => ({
+              ...styles.userBox,
+              ...(isActive ? styles.userBoxActive : {}),
+            })}
+          >
             <div style={styles.avatar}>
-              {user?.name ? user.name.charAt(0).toUpperCase() : "A"}
+              {user?.profile_image ? (
+                <img
+                  src={user.profile_image}
+                  alt={user.name}
+                  style={styles.avatarImage}
+                />
+              ) : user?.name ? (
+                user.name.charAt(0).toUpperCase()
+              ) : (
+                "A"
+              )}
             </div>
 
             <div>
               <p style={styles.userName}>{user?.name || "Admin"}</p>
               <p style={styles.userRole}>{user?.role || "admin"}</p>
             </div>
-          </div>
+          </NavLink>
 
           <nav style={styles.nav}>
             {navItems.map((item) => (
@@ -81,7 +97,7 @@ export default function AdminLayout() {
           <button onClick={handleLogout} style={styles.logoutButton}>
             <span style={styles.navIcon}>🚪</span>
             <span>Logout</span>
-          </button>
+          </button> 
         </div>
       </aside>
 
@@ -158,6 +174,9 @@ const styles = {
     borderRadius: "16px",
     padding: "14px",
     marginBottom: "24px",
+    textDecoration: "none",
+    color: "#ffffff",
+    cursor: "pointer",
   },
 
   avatar: {
@@ -171,6 +190,8 @@ const styles = {
     justifyContent: "center",
     fontSize: "18px",
     fontWeight: "800",
+    overflow: "hidden",
+    flexShrink: 0,
   },
 
   userName: {
@@ -258,5 +279,16 @@ const styles = {
     minHeight: "100vh",
     backgroundColor: "#f5f7fb",
     boxSizing: "border-box",
+  },
+
+  userBoxActive: {
+    backgroundColor: "rgba(79, 70, 229, 0.35)",
+    border: "1px solid rgba(129, 140, 248, 0.55)",
+  },
+
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
   },
 };

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\API\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\User;
-use Illuminate\Http\Request;
 
 class AdminDashboardController extends Controller
 {
@@ -18,6 +17,10 @@ class AdminDashboardController extends Controller
             'total_customers' => User::role('user')->count(),
             'total_delivery_men' => User::role('delivery_man')->count(),
             'total_products' => Product::count(),
+
+            'pending_accounts' => User::where('account_status', 'pending')->count(),
+            'active_accounts' => User::where('account_status', 'active')->count(),
+            'rejected_accounts' => User::where('account_status', 'rejected')->count(),
         ]);
     }
 }

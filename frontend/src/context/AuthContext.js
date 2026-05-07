@@ -24,8 +24,11 @@ export function AuthProvider({ children }) {
   const register = async (formData) => {
     const response = await api.post("/register", formData);
 
-    localStorage.setItem("token", response.data.token);
-    setUser(response.data.user);
+    if (response.data.token) {
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
+      setUser(response.data.user);
+    }
 
     return response.data;
   };
@@ -55,6 +58,7 @@ export function AuthProvider({ children }) {
 
       const response = await api.get("/user");
       setUser(response.data);
+      localStorage.setItem("user", JSON.stringify(response.data));
     } catch (error) {
       localStorage.removeItem("token");
       setUser(null);
@@ -67,6 +71,11 @@ export function AuthProvider({ children }) {
     fetchUser();
   }, []);
 
+  const updateAuthUser = (updatedUser) => {
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+    setUser(updatedUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -76,6 +85,7 @@ export function AuthProvider({ children }) {
         register,
         logout,
         isAuthenticated,
+        updateAuthUser,
       }}
     >
       {children}

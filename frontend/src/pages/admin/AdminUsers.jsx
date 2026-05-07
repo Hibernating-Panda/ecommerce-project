@@ -20,6 +20,7 @@ export default function AdminUsers() {
     email: "",
     password: "",
     role: "user",
+    account_status: "active",
   });
 
   const roleLabels = {
@@ -49,6 +50,7 @@ export default function AdminUsers() {
       email: "",
       password: "",
       role: "user",
+      account_status: "active",
     });
     setEditingUser(null);
   };
@@ -91,6 +93,7 @@ export default function AdminUsers() {
       email: user.email || "",
       password: "",
       role: user.role || "user",
+      account_status: user.account_status || "active",
     });
 
     window.scrollTo({
@@ -161,6 +164,36 @@ export default function AdminUsers() {
     } catch (error) {
       console.log(error.response?.data || error);
       setError(error.response?.data?.message || "Failed to delete user.");
+    }
+  };
+
+  const approveUser = async (id) => {
+    try {
+      setMessage("");
+      setError("");
+
+      await api.patch(`/admin/users/${id}/approve`);
+
+      setMessage("User approved successfully.");
+      fetchUsers();
+    } catch (error) {
+      console.log(error.response?.data || error);
+      setError(error.response?.data?.message || "Failed to approve user.");
+    }
+  };
+
+  const rejectUser = async (id) => {
+    try {
+      setMessage("");
+      setError("");
+
+      await api.patch(`/admin/users/${id}/reject`);
+
+      setMessage("User rejected successfully.");
+      fetchUsers();
+    } catch (error) {
+      console.log(error.response?.data || error);
+      setError(error.response?.data?.message || "Failed to reject user.");
     }
   };
 
@@ -255,6 +288,20 @@ export default function AdminUsers() {
                 <option value="delivery_man">Delivery Man</option>
               </select>
             </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Account Status</label>
+              <select
+                name="account_status"
+                value={formData.account_status}
+                onChange={handleChange}
+                style={styles.input}
+              >
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
           </div>
 
           <button type="submit" disabled={saving} style={styles.submitButton}>
@@ -317,6 +364,9 @@ export default function AdminUsers() {
                       <span style={getRoleBadgeStyle(user.role)}>
                         {roleLabels[user.role] || user.role}
                       </span>
+                      <span style={getStatusBadgeStyle(user.account_status)}>
+                        {user.account_status}
+                      </span>
                     </td>
 
                     <td style={styles.td}>
@@ -338,6 +388,24 @@ export default function AdminUsers() {
                         >
                           Delete
                         </button>
+
+                        {user.account_status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => approveUser(user.id)}
+                            style={styles.approveButton}
+                          >
+                            Approve
+                          </button>
+
+                          <button
+                            onClick={() => rejectUser(user.id)}
+                            style={styles.rejectButton}
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
                       </div>
                     </td>
                   </tr>
@@ -402,6 +470,39 @@ const getRoleBadgeStyle = (role) => {
       ...base,
       backgroundColor: "#dbeafe",
       color: "#1e40af",
+    };
+  }
+
+  return {
+    ...base,
+    backgroundColor: "#dcfce7",
+    color: "#166534",
+  };
+};
+
+const getStatusBadgeStyle = (status) => {
+  const base = {
+    display: "inline-block",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    fontSize: "12px",
+    fontWeight: "700",
+    textTransform: "capitalize",
+  };
+
+  if (status === "pending") {
+    return {
+      ...base,
+      backgroundColor: "#fef3c7",
+      color: "#92400e",
+    };
+  }
+
+  if (status === "rejected") {
+    return {
+      ...base,
+      backgroundColor: "#fee2e2",
+      color: "#991b1b",
     };
   }
 
@@ -749,5 +850,25 @@ const styles = {
     color: "#ffffff",
     cursor: "pointer",
     fontWeight: "800",
+  },
+
+  approveButton: {
+    padding: "8px 12px",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#16a34a",
+    color: "#ffffff",
+    cursor: "pointer",
+    fontWeight: "700",
+  },
+
+  rejectButton: {
+    padding: "8px 12px",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#f97316",
+    color: "#ffffff",
+    cursor: "pointer",
+    fontWeight: "700",
   },
 };

@@ -23,6 +23,7 @@ class AdminUserController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->getRoleNames()->first(),
+                    'account_status' => $user->account_status,
                     'created_at' => $user->created_at,
                 ];
             });
@@ -37,12 +38,14 @@ class AdminUserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
             'role' => 'required|in:shop_owner,user,delivery_man',
+            'account_status' => 'required|in:active,pending,rejected',
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'account_status' => $request->account_status,
         ]);
 
         $user->assignRole($request->role);
@@ -54,6 +57,7 @@ class AdminUserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->getRoleNames()->first(),
+                'account_status' => $user->account_status,
                 'created_at' => $user->created_at,
             ],
         ], 201);
@@ -72,6 +76,7 @@ class AdminUserController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->getRoleNames()->first(),
+            'account_status' => $user->account_status,
             'created_at' => $user->created_at,
         ]);
     }
@@ -88,18 +93,19 @@ class AdminUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $user->id,
             'role' => 'required|in:shop_owner,user,delivery_man',
+            'account_status' => 'required|in:active,pending,rejected',
             'password' => 'nullable|min:6',
         ]);
 
         $user->name = $request->name;
         $user->email = $request->email;
+        $user->account_status = $request->account_status;
 
         if ($request->filled('password')) {
             $user->password = Hash::make($request->password);
         }
 
         $user->save();
-
         $user->syncRoles([$request->role]);
 
         return response()->json([
@@ -109,8 +115,41 @@ class AdminUserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->getRoleNames()->first(),
+                'account_status' => $user->account_status,
                 'created_at' => $user->created_at,
             ],
+        ]);
+    }
+
+    public function approve(User $user)
+    {
+        if ($user->hasRole('admin')) {
+            return response()->json([
+                'message' => 'Admin users cannot be changed here',
+            ], 403);
+        }
+
+        $user->account_status = 'active';
+        $user->save();
+
+        return response()->json([
+            'message' => 'User approved successfully',
+        ]);
+    }
+
+    public function reject(User $user)
+    {
+        if ($user->hasRole('admin')) {
+            return response()->json([
+                'message' => 'Admin users cannot be changed here',
+            ], 403);
+        }
+
+        $user->account_status = 'rejected';
+        $user->save();
+
+        return response()->json([
+            'message' => 'User rejected successfully',
         ]);
     }
 
