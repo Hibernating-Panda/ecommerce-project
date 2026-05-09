@@ -116,6 +116,7 @@ export default function AdminUsers() {
         name: formData.name,
         email: formData.email,
         role: formData.role,
+        account_status: formData.account_status,
       };
 
       if (formData.password.trim() !== "") {
@@ -262,7 +263,7 @@ export default function AdminUsers() {
 
             <div style={styles.formGroup}>
               <label style={styles.label}>
-                Password {editingUser && <span style={styles.hint}>(leave blank to keep current)</span>}
+                Password {editingUser && <span style={styles.hint}>(blank to keep current)</span>}
               </label>
               <input
                 type="password"
@@ -339,6 +340,7 @@ export default function AdminUsers() {
                   <th style={styles.th}>Name</th>
                   <th style={styles.th}>Email</th>
                   <th style={styles.th}>Role</th>
+                  <th style={styles.th}>Status</th>
                   <th style={styles.th}>Created</th>
                   <th style={styles.th}>Action</th>
                 </tr>
@@ -364,6 +366,9 @@ export default function AdminUsers() {
                       <span style={getRoleBadgeStyle(user.role)}>
                         {roleLabels[user.role] || user.role}
                       </span>
+                    </td>
+
+                    <td style={styles.td}>
                       <span style={getStatusBadgeStyle(user.account_status)}>
                         {user.account_status}
                       </span>
