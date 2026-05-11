@@ -50,7 +50,7 @@ const LoginPage = () => {
       } else if (data.user.role === "delivery_man") {
         navigate("/delivery");
       } else {
-        navigate("/home");
+        navigate("/");
       }
     } catch (error) {
       console.log("LOGIN ERROR:", error.response?.data);

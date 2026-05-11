@@ -29,6 +29,10 @@ function ShopOwnerSidebar() {
           Orders
         </NavLink>
 
+        <NavLink to="/shop/sales" style={linkStyle}>
+          Sales Report
+        </NavLink>
+
         <NavLink to="/shop/profile" style={linkStyle}>
           Shop Profile
         </NavLink>

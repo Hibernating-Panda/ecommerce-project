@@ -25,7 +25,7 @@ function RoleRedirect() {
     return <Navigate to="/delivery" replace />;
   }
 
-  return <Navigate to="/home" replace />;
+  return <Navigate to="/" replace />;
 }
 
 export default RoleRedirect;

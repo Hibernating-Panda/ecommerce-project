@@ -153,7 +153,7 @@ export default function PhoneTabletPage() {
 
         {/* Breadcrumb */}
         <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-          <span onClick={() => navigate("/home")} style={{ cursor: "pointer", color: COLORS.primary }}>Home</span>
+          <span onClick={() => navigate("/")} style={{ cursor: "pointer", color: COLORS.primary }}>Home</span>
           <span>›</span>
           <span style={{ color: COLORS.text, fontWeight: 600 }}>📱 Phones & Tablets</span>
         </div>

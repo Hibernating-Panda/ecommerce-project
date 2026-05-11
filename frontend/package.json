@@ -4,31 +4,32 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "start": "vite",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src"
   },
   "dependencies": {
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "react-router-dom": "^7.14.2",
     "axios": "^1.16.0",
-    "recharts": "^3.8.1",
-    "react-leaflet": "^4.2.2",
-    "leaflet": "^1.9.4",
+    "clsx": "^2.0.0",
     "framer-motion": "^11.0.3",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.292.0",
-    "clsx": "^2.0.0"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
+    "react-router-dom": "^7.14.2",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^7.0.7",
-    "tailwindcss": "^4.2.4",
     "@tailwindcss/vite": "^4.0.0",
+    "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.31",
     "eslint": "^8.53.0",
-    "eslint-plugin-react": "^7.33.2"
+    "eslint-plugin-react": "^7.33.2",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^4.2.4",
+    "vite": "^7.0.7"
   }
 }

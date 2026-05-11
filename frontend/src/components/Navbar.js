@@ -9,7 +9,7 @@ const Navbar = () => {
 
   const [search, setSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [authPopup, setAuthPopup] = useState(null); // "login" | "register" | null
+  const [authPopup, setAuthPopup] = useState(null);
   const [loginMessage, setLoginMessage] = useState("");
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -50,13 +50,20 @@ const Navbar = () => {
   const redirectByRole = (role) => {
     if (role === "admin") {
       navigate("/admin");
-    } else if (role === "shop_owner") {
-      navigate("/shop");
-    } else if (role === "delivery_man") {
-      navigate("/delivery");
-    } else {
-      navigate("/home");
+      return;
     }
+
+    if (role === "shop_owner") {
+      navigate("/shop");
+      return;
+    }
+
+    if (role === "delivery_man") {
+      navigate("/delivery");
+      return;
+    }
+
+    navigate("/");
   };
 
   const openLogin = (message = "") => {
@@ -79,27 +86,51 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate("/home");
+    setDropdownOpen(false);
+    navigate("/");
+  };
+
+  const requireLogin = (route) => {
+    if (!user) {
+      openLogin("Login to continue");
+      return;
+    }
+
+    navigate(route);
+    setDropdownOpen(false);
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
 
-    if (!user) {
-      openLogin("Login to continue");
-      return;
-    }
+    const keyword = search.trim();
 
-    console.log("Search:", search);
+    if (!keyword) return;
+
+    navigate(`/search?keyword=${encodeURIComponent(keyword)}`);
   };
 
   const handleCartClick = () => {
+    requireLogin("/customer/cart");
+  };
+
+  const goToDashboard = () => {
     if (!user) {
       openLogin("Login to continue");
       return;
     }
 
-    navigate("/cart");
+    if (user.role === "admin") {
+      navigate("/admin");
+    } else if (user.role === "shop_owner") {
+      navigate("/shop");
+    } else if (user.role === "delivery_man") {
+      navigate("/delivery");
+    } else {
+      navigate("/customer/dashboard");
+    }
+
+    setDropdownOpen(false);
   };
 
   const handleLoginChange = (e) => {
@@ -191,7 +222,8 @@ const Navbar = () => {
         setErrors(error.response.data.errors);
       } else {
         setErrors({
-          general: error.response?.data?.message || "Login failed. Please try again.",
+          general:
+            error.response?.data?.message || "Login failed. Please try again.",
         });
       }
     } finally {
@@ -223,7 +255,8 @@ const Navbar = () => {
 
       if (response.requires_approval) {
         setErrors({
-          general: "Registration submitted. Please wait for admin approval before logging in.",
+          general:
+            "Registration submitted. Please wait for admin approval before logging in.",
         });
 
         setTimeout(() => {
@@ -291,14 +324,14 @@ const Navbar = () => {
   useEffect(() => {
     if (location.pathname === "/login") {
       openLogin();
-      navigate("/home", { replace: true });
+      navigate("/", { replace: true });
     }
 
     if (location.pathname === "/register") {
       openRegister();
-      navigate("/home", { replace: true });
+      navigate("/", { replace: true });
     }
-  }, [location.pathname]);
+  }, [location.pathname, navigate]);
 
   const initials = user?.name
     ? user.name
@@ -309,120 +342,90 @@ const Navbar = () => {
         .slice(0, 2)
     : "?";
 
+  const isCustomer = user?.role === "user";
+
+  const customerMenu = [
+    {
+      label: "Dashboard",
+      icon: "🏠",
+      action: () => requireLogin("/customer/dashboard"),
+    },
+    {
+      label: "My Cart",
+      icon: "🛒",
+      action: () => requireLogin("/customer/cart"),
+    },
+    {
+      label: "My Orders",
+      icon: "📦",
+      action: () => requireLogin("/customer/orders"),
+    },
+    {
+      label: "Wishlist",
+      icon: "❤️",
+      action: () => requireLogin("/customer/wishlist"),
+    },
+    {
+      label: "Reviews",
+      icon: "⭐",
+      action: () => requireLogin("/customer/reviews"),
+    },
+    {
+      label: "Edit Profile",
+      icon: "✏️",
+      action: () => requireLogin("/customer/profile"),
+    },
+  ];
+
+  const staffMenu = [
+    {
+      label: "Dashboard",
+      icon: "🏠",
+      action: goToDashboard,
+    },
+  ];
+
+  const menuItems = isCustomer ? customerMenu : staffMenu;
+
   return (
     <>
-      <nav
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          backgroundColor: "#fff",
-          borderBottom: "2px solid #E8192C",
-          padding: "0 24px",
-          height: 60,
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-        }}
-      >
-        <div
-          onClick={() => navigate("/home")}
-          style={{ cursor: "pointer", flexShrink: 0, minWidth: 80 }}
-        >
-          <span
-            style={{
-              fontSize: 26,
-              fontWeight: 900,
-              color: "#E8192C",
-              letterSpacing: -1,
-              fontFamily: "Georgia, serif",
-            }}
-          >
-            E-Shop
-          </span>
+      <nav style={styles.navbar}>
+        <div onClick={() => navigate("/")} style={styles.logoBox}>
+          <span style={styles.logo}>E-Shop</span>
         </div>
 
-        <form
-          onSubmit={handleSearch}
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            maxWidth: 640,
-            margin: "0 auto",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              width: "100%",
-              border: "1px solid #ddd",
-              borderRadius: 6,
-              overflow: "hidden",
-              background: "#f5f5f5",
-            }}
-          >
+        <form onSubmit={handleSearch} style={styles.searchForm}>
+          <div style={styles.searchBox}>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search"
-              style={{
-                flex: 1,
-                padding: "8px 14px",
-                border: "none",
-                background: "transparent",
-                fontSize: 14,
-                color: "#333",
-                outline: "none",
-              }}
+              placeholder="Search products..."
+              style={styles.searchInput}
             />
 
-            <button
-              type="submit"
-              style={{
-                padding: "0 14px",
-                background: "#e0e0e0",
-                border: "none",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+            <button type="submit" style={styles.searchButton}>
               🔍
             </button>
           </div>
         </form>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <div style={styles.rightActions}>
           <button
             onClick={handleCartClick}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: 6,
-              fontSize: 22,
-            }}
+            title="Cart"
+            style={styles.iconButton}
           >
             🛒
           </button>
 
           {!user ? (
             <>
-              <button
-                onClick={() => openLogin()}
-                style={styles.outlineButton}
-              >
+              <button onClick={() => openLogin()} style={styles.outlineButton}>
                 Login
               </button>
 
-              <button
-                onClick={openRegister}
-                style={styles.redButton}
-              >
+              <button onClick={openRegister} style={styles.redButton}>
                 Sign Up
               </button>
             </>
@@ -431,19 +434,10 @@ const Navbar = () => {
               <div
                 onClick={() => setDropdownOpen((o) => !o)}
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: "50%",
-                  background: "#E8192C",
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  userSelect: "none",
-                  border: dropdownOpen ? "2px solid #b0001f" : "2px solid transparent",
+                  ...styles.avatar,
+                  border: dropdownOpen
+                    ? "2px solid #b0001f"
+                    : "2px solid transparent",
                 }}
               >
                 {initials}
@@ -451,41 +445,21 @@ const Navbar = () => {
 
               {dropdownOpen && (
                 <div style={styles.dropdown}>
-                  <div style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0" }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                      {user?.name}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
-                      {user?.email}
+                  <div style={styles.userInfo}>
+                    <div style={styles.userName}>{user?.name}</div>
+                    <div style={styles.userEmail}>{user?.email}</div>
+                    <div style={styles.userRole}>
+                      {user?.role === "user"
+                        ? "Customer"
+                        : user?.role === "shop_owner"
+                        ? "Shop Owner"
+                        : user?.role === "delivery_man"
+                        ? "Delivery Man"
+                        : user?.role}
                     </div>
                   </div>
 
-                  {[
-                    {
-                      label: "Dashboard",
-                      icon: "🏠",
-                      action: () => {
-                        navigate("/dashboard");
-                        setDropdownOpen(false);
-                      },
-                    },
-                    {
-                      label: "My Orders",
-                      icon: "📦",
-                      action: () => {
-                        navigate("/orders");
-                        setDropdownOpen(false);
-                      },
-                    },
-                    {
-                      label: "Edit Profile",
-                      icon: "✏️",
-                      action: () => {
-                        navigate("/profile");
-                        setDropdownOpen(false);
-                      },
-                    },
-                  ].map((item) => (
+                  {menuItems.map((item) => (
                     <div
                       key={item.label}
                       onClick={item.action}
@@ -522,17 +496,9 @@ const Navbar = () => {
               </button>
             </div>
 
-            {loginMessage && (
-              <div style={styles.noticeBox}>
-                {loginMessage}
-              </div>
-            )}
+            {loginMessage && <div style={styles.noticeBox}>{loginMessage}</div>}
 
-            {errors.general && (
-              <div style={styles.errorBox}>
-                {errors.general}
-              </div>
-            )}
+            {errors.general && <div style={styles.errorBox}>{errors.general}</div>}
 
             {authPopup === "login" ? (
               <form onSubmit={handleLoginSubmit}>
@@ -545,11 +511,15 @@ const Navbar = () => {
                   placeholder="Enter your email"
                   style={{
                     ...styles.input,
-                    border: getError("email") ? "1px solid #dc2626" : "1px solid #ddd",
+                    border: getError("email")
+                      ? "1px solid #dc2626"
+                      : "1px solid #ddd",
                   }}
                   required
                 />
-                {getError("email") && <p style={styles.fieldError}>{getError("email")}</p>}
+                {getError("email") && (
+                  <p style={styles.fieldError}>{getError("email")}</p>
+                )}
 
                 <label style={styles.label}>Password</label>
                 <input
@@ -560,11 +530,15 @@ const Navbar = () => {
                   placeholder="Enter your password"
                   style={{
                     ...styles.input,
-                    border: getError("password") ? "1px solid #dc2626" : "1px solid #ddd",
+                    border: getError("password")
+                      ? "1px solid #dc2626"
+                      : "1px solid #ddd",
                   }}
                   required
                 />
-                {getError("password") && <p style={styles.fieldError}>{getError("password")}</p>}
+                {getError("password") && (
+                  <p style={styles.fieldError}>{getError("password")}</p>
+                )}
 
                 <button type="submit" disabled={loading} style={styles.submitButton}>
                   {loading ? "Logging in..." : "Login"}
@@ -588,11 +562,15 @@ const Navbar = () => {
                   placeholder="Enter your name"
                   style={{
                     ...styles.input,
-                    border: getError("name") ? "1px solid #dc2626" : "1px solid #ddd",
+                    border: getError("name")
+                      ? "1px solid #dc2626"
+                      : "1px solid #ddd",
                   }}
                   required
                 />
-                {getError("name") && <p style={styles.fieldError}>{getError("name")}</p>}
+                {getError("name") && (
+                  <p style={styles.fieldError}>{getError("name")}</p>
+                )}
 
                 <label style={styles.label}>Email</label>
                 <input
@@ -603,11 +581,15 @@ const Navbar = () => {
                   placeholder="Enter your email"
                   style={{
                     ...styles.input,
-                    border: getError("email") ? "1px solid #dc2626" : "1px solid #ddd",
+                    border: getError("email")
+                      ? "1px solid #dc2626"
+                      : "1px solid #ddd",
                   }}
                   required
                 />
-                {getError("email") && <p style={styles.fieldError}>{getError("email")}</p>}
+                {getError("email") && (
+                  <p style={styles.fieldError}>{getError("email")}</p>
+                )}
 
                 <label style={styles.label}>Register As</label>
                 <select
@@ -616,7 +598,9 @@ const Navbar = () => {
                   onChange={handleRegisterChange}
                   style={{
                     ...styles.input,
-                    border: getError("role") ? "1px solid #dc2626" : "1px solid #ddd",
+                    border: getError("role")
+                      ? "1px solid #dc2626"
+                      : "1px solid #ddd",
                   }}
                   required
                 >
@@ -628,10 +612,15 @@ const Navbar = () => {
                 </select>
 
                 <p style={styles.roleHint}>
-                  {roleOptions.find((role) => role.value === registerData.role)?.description}
+                  {
+                    roleOptions.find((role) => role.value === registerData.role)
+                      ?.description
+                  }
                 </p>
 
-                {getError("role") && <p style={styles.fieldError}>{getError("role")}</p>}
+                {getError("role") && (
+                  <p style={styles.fieldError}>{getError("role")}</p>
+                )}
 
                 <label style={styles.label}>Password</label>
                 <input
@@ -642,11 +631,15 @@ const Navbar = () => {
                   placeholder="Enter your password"
                   style={{
                     ...styles.input,
-                    border: getError("password") ? "1px solid #dc2626" : "1px solid #ddd",
+                    border: getError("password")
+                      ? "1px solid #dc2626"
+                      : "1px solid #ddd",
                   }}
                   required
                 />
-                {getError("password") && <p style={styles.fieldError}>{getError("password")}</p>}
+                {getError("password") && (
+                  <p style={styles.fieldError}>{getError("password")}</p>
+                )}
 
                 <label style={styles.label}>Confirm Password</label>
                 <input
@@ -657,12 +650,16 @@ const Navbar = () => {
                   placeholder="Confirm your password"
                   style={{
                     ...styles.input,
-                    border: getError("password_confirmation") ? "1px solid #dc2626" : "1px solid #ddd",
+                    border: getError("password_confirmation")
+                      ? "1px solid #dc2626"
+                      : "1px solid #ddd",
                   }}
                   required
                 />
                 {getError("password_confirmation") && (
-                  <p style={styles.fieldError}>{getError("password_confirmation")}</p>
+                  <p style={styles.fieldError}>
+                    {getError("password_confirmation")}
+                  </p>
                 )}
 
                 <button type="submit" disabled={loading} style={styles.submitButton}>
@@ -685,6 +682,101 @@ const Navbar = () => {
 };
 
 const styles = {
+  navbar: {
+    position: "sticky",
+    top: 0,
+    zIndex: 100,
+    backgroundColor: "#fff",
+    borderBottom: "2px solid #E8192C",
+    padding: "0 24px",
+    height: 60,
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+  },
+
+  logoBox: {
+    cursor: "pointer",
+    flexShrink: 0,
+    minWidth: 80,
+  },
+
+  logo: {
+    fontSize: 26,
+    fontWeight: 900,
+    color: "#E8192C",
+    letterSpacing: -1,
+    fontFamily: "Georgia, serif",
+  },
+
+  searchForm: {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    maxWidth: 640,
+    margin: "0 auto",
+  },
+
+  searchBox: {
+    display: "flex",
+    width: "100%",
+    border: "1px solid #ddd",
+    borderRadius: 6,
+    overflow: "hidden",
+    background: "#f5f5f5",
+  },
+
+  searchInput: {
+    flex: 1,
+    padding: "8px 14px",
+    border: "none",
+    background: "transparent",
+    fontSize: 14,
+    color: "#333",
+    outline: "none",
+  },
+
+  searchButton: {
+    padding: "0 14px",
+    background: "#e0e0e0",
+    border: "none",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  rightActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    flexShrink: 0,
+  },
+
+  iconButton: {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: 6,
+    fontSize: 22,
+  },
+
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: "50%",
+    background: "#E8192C",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+    userSelect: "none",
+  },
+
   outlineButton: {
     background: "#fff",
     border: "1px solid #ddd",
@@ -695,6 +787,7 @@ const styles = {
     fontWeight: 700,
     fontSize: 13,
   },
+
   redButton: {
     background: "#E8192C",
     border: "none",
@@ -705,6 +798,7 @@ const styles = {
     fontWeight: 700,
     fontSize: 13,
   },
+
   dropdown: {
     position: "absolute",
     right: 0,
@@ -713,10 +807,39 @@ const styles = {
     border: "1px solid #eee",
     borderRadius: 8,
     boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
-    minWidth: 200,
+    minWidth: 220,
     zIndex: 200,
     overflow: "hidden",
   },
+
+  userInfo: {
+    padding: "12px 16px",
+    borderBottom: "1px solid #f0f0f0",
+  },
+
+  userName: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#1a1a1a",
+  },
+
+  userEmail: {
+    fontSize: 11,
+    color: "#888",
+    marginTop: 2,
+  },
+
+  userRole: {
+    display: "inline-block",
+    marginTop: 7,
+    background: "#FFF0F1",
+    color: "#E8192C",
+    padding: "3px 8px",
+    borderRadius: 999,
+    fontSize: 10,
+    fontWeight: 800,
+  },
+
   dropdownItem: {
     padding: "10px 16px",
     fontSize: 13,
@@ -726,6 +849,7 @@ const styles = {
     alignItems: "center",
     gap: 10,
   },
+
   logoutItem: {
     padding: "10px 16px",
     fontSize: 13,
@@ -736,6 +860,7 @@ const styles = {
     gap: 10,
     fontWeight: 600,
   },
+
   overlay: {
     position: "fixed",
     inset: 0,
@@ -746,6 +871,7 @@ const styles = {
     zIndex: 999,
     padding: 20,
   },
+
   modal: {
     width: "100%",
     maxWidth: 430,
@@ -756,12 +882,14 @@ const styles = {
     padding: 24,
     boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
   },
+
   modalHeader: {
     display: "flex",
     justifyContent: "space-between",
     marginBottom: 16,
     alignItems: "center",
   },
+
   closeButton: {
     border: "none",
     background: "transparent",
@@ -769,6 +897,7 @@ const styles = {
     cursor: "pointer",
     lineHeight: 1,
   },
+
   noticeBox: {
     background: "#FFF0F1",
     color: "#E8192C",
@@ -778,6 +907,7 @@ const styles = {
     fontWeight: 700,
     marginBottom: 14,
   },
+
   errorBox: {
     background: "#fee2e2",
     color: "#991b1b",
@@ -788,6 +918,7 @@ const styles = {
     fontSize: 13,
     fontWeight: 600,
   },
+
   label: {
     display: "block",
     marginBottom: 6,
@@ -795,6 +926,7 @@ const styles = {
     fontWeight: 700,
     fontSize: 13,
   },
+
   input: {
     width: "100%",
     padding: "11px 12px",
@@ -805,17 +937,20 @@ const styles = {
     boxSizing: "border-box",
     background: "#fff",
   },
+
   fieldError: {
     color: "#dc2626",
     fontSize: 12,
     marginTop: -6,
     marginBottom: 10,
   },
+
   roleHint: {
     margin: "-4px 0 10px 0",
     color: "#6b7280",
     fontSize: 12,
   },
+
   submitButton: {
     width: "100%",
     background: "#E8192C",
@@ -828,6 +963,7 @@ const styles = {
     cursor: "pointer",
     marginTop: 6,
   },
+
   switchText: {
     textAlign: "center",
     fontSize: 13,
@@ -835,6 +971,7 @@ const styles = {
     marginBottom: 0,
     color: "#666",
   },
+
   switchLink: {
     color: "#E8192C",
     fontWeight: 700,

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -15,11 +16,6 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
         'email',
@@ -30,21 +26,15 @@ class User extends Authenticatable
         'profile_image',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
+    protected $appends = [
+        'role_name',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -54,34 +44,36 @@ class User extends Authenticatable
         ];
     }
 
-    /**
-     * Get the role associated with this user
-     */
-    public function role()
+    /*
+    |--------------------------------------------------------------------------
+    | Role Name Accessor
+    |--------------------------------------------------------------------------
+    | Uses Spatie roles safely.
+    */
+
+    public function getRoleNameAttribute()
     {
-        return $this->belongsTo(Role::class);
+        return $this->roles->first()?->name ?? 'customer';
     }
 
-    /**
-     * Check if user has specific role
-     */
-    public function hasRole($role)
-    {
-        return $this->role->name === $role;
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | Deliveries
+    |--------------------------------------------------------------------------
+    */
 
-    /**
-     * Get deliveries where user is the driver
-     */
     public function deliveries()
     {
-        return $this->hasMany(Delivery::class, 'driver_id');
+        return $this->hasMany(Delivery::class, 'delivery_man_id');
     }
 
-    /**
-     * Get notifications for this user
-     */
-    public function notifications()
+    /*
+    |--------------------------------------------------------------------------
+    | User Notifications
+    |--------------------------------------------------------------------------
+    */
+
+    public function userNotifications()
     {
         return $this->hasMany(Notification::class);
     }

@@ -12,8 +12,13 @@ class ShopController extends Controller
     public function index()
     {
         $shops = Shop::withCount('products')
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
             ->latest()
-            ->get();
+            ->get()
+            ->map(function ($shop) {
+                return $this->formatShop($shop);
+            });
 
         return response()->json([
             'success' => true,
@@ -24,8 +29,13 @@ class ShopController extends Controller
     // GET /api/shops/{id}
     public function show($id)
     {
-        $shop = Shop::with(['products.category'])
+        $shop = Shop::with([
+                'products.category',
+                'reviews.user',
+            ])
             ->withCount('products')
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
             ->find($id);
 
         if (!$shop) {
@@ -37,7 +47,7 @@ class ShopController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $shop,
+            'data' => $this->formatShop($shop),
         ]);
     }
 
@@ -51,6 +61,8 @@ class ShopController extends Controller
             'address' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'user_id' => 'nullable|exists:users,id',
+            'logo' => 'nullable|string',
+            'image' => 'nullable|string',
         ]);
 
         $shop = Shop::create($validated);
@@ -58,7 +70,7 @@ class ShopController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Shop created successfully',
-            'data' => $shop,
+            'data' => $this->formatShop($shop),
         ], 201);
     }
 
@@ -81,14 +93,20 @@ class ShopController extends Controller
             'address' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'user_id' => 'nullable|exists:users,id',
+            'logo' => 'nullable|string',
+            'image' => 'nullable|string',
         ]);
 
         $shop->update($validated);
 
+        $shop->loadCount('products')
+            ->loadAvg('reviews', 'rating')
+            ->loadCount('reviews');
+
         return response()->json([
             'success' => true,
             'message' => 'Shop updated successfully',
-            'data' => $shop,
+            'data' => $this->formatShop($shop),
         ]);
     }
 
@@ -110,5 +128,58 @@ class ShopController extends Controller
             'success' => true,
             'message' => 'Shop deleted successfully',
         ]);
+    }
+
+    private function formatShop($shop)
+    {
+        $logo = $shop->logo ?? $shop->image ?? null;
+
+        return [
+            'id' => $shop->id,
+            'user_id' => $shop->user_id,
+
+            'name' => $shop->shop_name ?? $shop->name ?? 'Shop',
+            'shop_name' => $shop->shop_name ?? $shop->name ?? 'Shop',
+            'owner_name' => $shop->owner_name,
+            'phone' => $shop->phone,
+            'address' => $shop->address,
+            'description' => $shop->description,
+
+            'logo' => $logo,
+            'image' => $logo,
+            'logo_url' => $this->getImageUrl($logo),
+
+            'products_count' => $shop->products_count ?? 0,
+            'items_count' => $shop->products_count ?? 0,
+
+            'average_rating' => $shop->reviews_avg_rating
+                ? round($shop->reviews_avg_rating, 1)
+                : null,
+
+            'reviews_count' => $shop->reviews_count ?? 0,
+
+            'products' => $shop->products ?? null,
+            'reviews' => $shop->reviews ?? null,
+
+            'created_at' => $shop->created_at,
+            'updated_at' => $shop->updated_at,
+        ];
+    }
+
+    private function getImageUrl($image)
+    {
+        if (!$image) {
+            return null;
+        }
+
+        if (str_starts_with($image, 'http://') || str_starts_with($image, 'https://')) {
+            return $image;
+        }
+
+        if (str_starts_with($image, 'storage/')) {
+            return asset($image);
+        }
+
+        return asset('storage/' . $image);
     }
 }

@@ -91,7 +91,7 @@ const RegisterPage = () => {
     } else if (role === "delivery_man") {
       navigate("/delivery");
     } else {
-      navigate("/home");
+      navigate("/");
     }
   };
 

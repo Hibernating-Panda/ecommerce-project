@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import api from "../../api/api";
+import api from "../../services/api";
 import PopupMessage from "../../components/common/PopupMessage";
 
 function ShopDashboard() {
@@ -20,7 +20,7 @@ function ShopDashboard() {
 
   const fetchDashboard = async () => {
     try {
-      const res = await api.get("/shopowner/dashboard");
+      const res = await api.get(`/shopowner/dashboard?filter=${filter}`);
       setDashboard(res.data);
     } catch (error) {
       console.error("Dashboard error:", error);
@@ -54,6 +54,8 @@ function ShopDashboard() {
       message: "",
     });
   };
+
+  const [filter, setFilter] = useState("day");
 
   if (loading) {
     return <p style={styles.loading}>Loading dashboard...</p>;
@@ -96,6 +98,16 @@ function ShopDashboard() {
           <p style={styles.cardLabel}>Completed Orders</p>
           <h2 style={styles.cardValue}>{dashboard.completed_orders}</h2>
         </div>
+
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          style={styles.filterSelect}
+        >
+          <option value="day">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+        </select>
 
         <div style={styles.card}>
           <p style={styles.cardLabel}>Total Sales</p>
@@ -242,6 +254,13 @@ const styles = {
     color: "#6b7280",
     textAlign: "center",
     padding: "20px",
+  },
+  filterSelect: {
+    padding: "12px 15px",
+    borderRadius: "12px",
+    border: "1px solid #d1d5db",
+    backgroundColor: "white",
+    fontWeight: "700",
   },
 };
 

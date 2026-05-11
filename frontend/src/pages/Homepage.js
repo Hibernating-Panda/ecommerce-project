@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
 
 const COLORS = {
   primary: "#E8192C",
@@ -12,32 +13,33 @@ const COLORS = {
   white: "#fff",
 };
 
-const API_BASE = "http://127.0.0.1:8000/api";
-
 const HERO_SLIDES = [
   {
     bg: "linear-gradient(135deg,#1428A0,#185FA5)",
     accent: "#E8192C",
-    badge: "NEW ARRIVAL",
-    title: "Latest Products",
-    subtitle: "Discover new items from real shops",
+    badge: "BEST DEAL",
+    title: "Newest Products",
+    subtitle: "Discover the latest items from real shops",
     cta: "Shop Now",
+    target: "best_deal",
   },
   {
     bg: "linear-gradient(135deg,#E8192C,#FF6B35)",
     accent: "rgba(255,255,255,0.25)",
     badge: "FLASH SALE",
-    title: "Best Deals Today",
-    subtitle: "Electronics, fashion, home products & more",
+    title: "Discount Deals Today",
+    subtitle: "Products with discounts from shop owners",
     cta: "Grab Deal",
+    target: "flash_sale",
   },
   {
     bg: "linear-gradient(135deg,#0d7a3f,#1DB954)",
     accent: "#F6AD55",
     badge: "TRENDING",
-    title: "Trending Products",
-    subtitle: "Popular items customers are viewing now",
-    cta: "View Collection",
+    title: "Most Sold Products",
+    subtitle: "Popular products customers are buying",
+    cta: "View Trending",
+    target: "trending",
   },
 ];
 
@@ -68,28 +70,87 @@ function getCategoryIcon(categoryName) {
 }
 
 function getShopName(shop) {
-  return shop.name || shop.shop_name || shop.store_name || "Shop";
+  return shop?.name || shop?.shop_name || shop?.store_name || "Shop";
 }
 
 function getShopLogo(shop) {
   return (
-    shop.logo ||
-    shop.image ||
-    shop.photo ||
-    shop.thumbnail ||
-    "https://via.placeholder.com/300x300?text=Shop"
+    shop?.logo ||
+    shop?.image ||
+    shop?.photo ||
+    shop?.thumbnail ||
+    "/no-image.png"
   );
+}
+
+function getProductImage(product) {
+  return (
+    product?.image_url ||
+    product?.thumbnail ||
+    product?.image ||
+    product?.photo ||
+    product?.img ||
+    "/no-image.png"
+  );
+}
+
+function getProductPrice(product) {
+  const price = Number(product?.price || 0);
+
+  const discountPercent = Number(
+    product?.discount_percent || product?.discount || 0
+  );
+
+  const discountPrice = Number(product?.discount_price || 0);
+
+  if (discountPrice > 0 && discountPrice < price) {
+    return {
+      originalPrice: price,
+      finalPrice: discountPrice,
+      discount: Math.round(((price - discountPrice) / price) * 100),
+    };
+  }
+
+  if (discountPercent > 0) {
+    const finalPrice = price - price * (discountPercent / 100);
+
+    return {
+      originalPrice: price,
+      finalPrice,
+      discount: discountPercent,
+    };
+  }
+
+  return {
+    originalPrice: price,
+    finalPrice: price,
+    discount: 0,
+  };
+}
+
+function formatRating(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const number = Number(value);
+
+  if (Number.isNaN(number)) {
+    return null;
+  }
+
+  return number.toFixed(1);
 }
 
 function HeroBanner({ onAction }) {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => {
-      setActive((a) => (a + 1) % HERO_SLIDES.length);
+    const timer = setInterval(() => {
+      setActive((current) => (current + 1) % HERO_SLIDES.length);
     }, 3500);
 
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
   }, []);
 
   const slide = HERO_SLIDES[active];
@@ -147,7 +208,7 @@ function HeroBanner({ onAction }) {
         </p>
 
         <button
-          onClick={onAction}
+          onClick={() => onAction(slide.target)}
           style={{
             background: slide.accent,
             color: "#fff",
@@ -185,15 +246,16 @@ function HeroBanner({ onAction }) {
           gap: 5,
         }}
       >
-        {HERO_SLIDES.map((_, i) => (
+        {HERO_SLIDES.map((_, index) => (
           <div
-            key={i}
-            onClick={() => setActive(i)}
+            key={index}
+            onClick={() => setActive(index)}
             style={{
-              width: i === active ? 20 : 6,
+              width: index === active ? 20 : 6,
               height: 6,
               borderRadius: 3,
-              background: i === active ? "#fff" : "rgba(255,255,255,0.38)",
+              background:
+                index === active ? "#fff" : "rgba(255,255,255,0.38)",
               cursor: "pointer",
               transition: "all 0.3s",
             }}
@@ -238,28 +300,18 @@ function SectionTitle({ title, onLink }) {
 function ProductCard({ product, compact, onClick }) {
   const [hovered, setHovered] = useState(false);
 
-  const price = Number(product.price || 0);
-  const originalPrice = Number(
-    product.originalPrice || product.original_price || product.old_price || price
-  );
+  const imageUrl = getProductImage(product);
+  const { originalPrice, finalPrice, discount } = getProductPrice(product);
 
-  const discount =
-    originalPrice > price ? Math.round((1 - price / originalPrice) * 100) : 0;
-
-  const imageUrl =
-    product.thumbnail ||
-    product.image ||
-    product.photo ||
-    product.img ||
-    "https://via.placeholder.com/300x300?text=No+Image";
-
-  const rating = product.rating || "4.5";
-  const sold = product.sold || product.total_sold || 0;
+  const rating = formatRating(product.average_rating);
+  const reviewCount =
+    product.reviews_count || product.product_reviews_count || 0;
+  const sold = product.sold || product.total_sold || product.quantity_sold || 0;
   const hue = ((product.id || 1) * 37) % 360;
 
   return (
     <div
-      onClick={() => onClick && onClick(product)}
+      onClick={() => onClick(product)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -268,8 +320,11 @@ function ProductCard({ product, compact, onClick }) {
         border: `1px solid ${COLORS.border}`,
         padding: compact ? 8 : 10,
         cursor: "pointer",
-        boxShadow: hovered ? "0 2px 10px rgba(0,0,0,0.08)" : "none",
-        transition: "box-shadow 0.2s",
+        boxShadow: hovered
+          ? "0 6px 18px rgba(232,25,44,0.14)"
+          : "0 1px 2px rgba(0,0,0,0.02)",
+        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+        transition: "all 0.2s",
       }}
     >
       <div
@@ -296,7 +351,7 @@ function ProductCard({ product, compact, onClick }) {
             borderRadius: 6,
           }}
           onError={(e) => {
-            e.target.src = "https://via.placeholder.com/300x300?text=No+Image";
+            e.target.src = "/no-image.png";
           }}
         />
 
@@ -330,6 +385,7 @@ function ProductCard({ product, compact, onClick }) {
           display: compact ? "block" : "-webkit-box",
           WebkitLineClamp: compact ? "unset" : 2,
           WebkitBoxOrient: "vertical",
+          minHeight: compact ? "auto" : 30,
         }}
       >
         {product.name}
@@ -341,6 +397,7 @@ function ProductCard({ product, compact, onClick }) {
           alignItems: "center",
           gap: 5,
           marginBottom: 3,
+          flexWrap: "wrap",
         }}
       >
         <span
@@ -350,10 +407,10 @@ function ProductCard({ product, compact, onClick }) {
             color: COLORS.primary,
           }}
         >
-          ${price.toFixed(2)}
+          ${finalPrice.toFixed(2)}
         </span>
 
-        {originalPrice > price && (
+        {discount > 0 && (
           <span
             style={{
               fontSize: compact ? 9 : 10,
@@ -368,7 +425,15 @@ function ProductCard({ product, compact, onClick }) {
 
       {!compact && (
         <div style={{ fontSize: 10, color: COLORS.textMuted }}>
-          ⭐ {rating} · {Number(sold).toLocaleString()} sold
+          {reviewCount > 0 && rating ? (
+            <>
+              ⭐ {rating} · {reviewCount} review
+              {reviewCount > 1 ? "s" : ""} · {Number(sold).toLocaleString()}{" "}
+              sold
+            </>
+          ) : (
+            <>No reviews yet · {Number(sold).toLocaleString()} sold</>
+          )}
         </div>
       )}
     </div>
@@ -381,7 +446,10 @@ function ShopCard({ shop, index, onClick }) {
   const name = getShopName(shop);
   const logo = getShopLogo(shop);
   const itemCount = shop.products_count || shop.items_count || shop.items || 0;
-  const rating = shop.rating || "4.5";
+
+  const rating = formatRating(shop.average_rating);
+  const reviewCount = shop.reviews_count || shop.shop_reviews_count || 0;
+
   const verified = shop.verified || shop.is_verified || false;
 
   return (
@@ -443,7 +511,15 @@ function ShopCard({ shop, index, onClick }) {
         </div>
 
         <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
-          ⭐ {rating} · {Number(itemCount).toLocaleString()} items
+          {reviewCount > 0 && rating ? (
+            <>
+              ⭐ {rating} · {reviewCount} review
+              {reviewCount > 1 ? "s" : ""} ·{" "}
+              {Number(itemCount).toLocaleString()} items
+            </>
+          ) : (
+            <>No reviews yet · {Number(itemCount).toLocaleString()} items</>
+          )}
         </div>
       </div>
 
@@ -472,6 +548,7 @@ function ShopCard({ shop, index, onClick }) {
 function PartnerShopCard({ shop, index, onClick }) {
   const name = getShopName(shop);
   const logo = getShopLogo(shop);
+
   const description =
     shop.description ||
     shop.address ||
@@ -517,9 +594,7 @@ function PartnerShopCard({ shop, index, onClick }) {
             objectFit: "cover",
           }}
           onError={(e) => {
-            e.target.style.display = "none";
-            e.currentTarget.parentElement.innerHTML = "🏪";
-            e.currentTarget.parentElement.style.fontSize = "22px";
+            e.currentTarget.style.display = "none";
           }}
         />
       </div>
@@ -568,9 +643,16 @@ function PartnerShopCard({ shop, index, onClick }) {
 
 export default function HomePage() {
   const [activeCategory, setActiveCategory] = useState(null);
+
   const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
   const [shops, setShops] = useState([]);
+
+  const [homeData, setHomeData] = useState({
+    flash_sale: [],
+    best_deal: [],
+    trending: [],
+  });
+
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
@@ -584,31 +666,35 @@ export default function HomePage() {
     try {
       setLoading(true);
 
-      const [productRes, categoryRes, shopRes] = await Promise.all([
-        fetch(`${API_BASE}/products`),
-        fetch(`${API_BASE}/categories`),
-        fetch(`${API_BASE}/shops`),
+      const [homeRes, categoryRes, shopRes] = await Promise.all([
+        api.get("/homepage-products"),
+        api.get("/categories"),
+        api.get("/shops"),
       ]);
 
-      const productJson = await productRes.json();
-      const categoryJson = await categoryRes.json();
-      const shopJson = await shopRes.json();
-
-      const realProducts = Array.isArray(productJson)
-        ? productJson
-        : productJson.data || [];
+      const homeJson = homeRes.data || {};
+      const categoryJson = categoryRes.data || [];
+      const shopJson = shopRes.data || [];
 
       const realCategories = Array.isArray(categoryJson)
         ? categoryJson
         : categoryJson.data || [];
 
-      const realShops = Array.isArray(shopJson) ? shopJson : shopJson.data || [];
+      const realShops = Array.isArray(shopJson)
+        ? shopJson
+        : shopJson.data || [];
 
-      setProducts(realProducts);
+      setHomeData({
+        flash_sale: homeJson.flash_sale || [],
+        best_deal: homeJson.best_deal || [],
+        trending: homeJson.trending || [],
+      });
+
       setShops(realShops);
 
       setCategories(
         realCategories.map((cat) => ({
+          id: cat.id,
           icon: cat.icon || getCategoryIcon(cat.name),
           label: cat.name,
           route: `/category/${cat.id}`,
@@ -616,7 +702,13 @@ export default function HomePage() {
       );
     } catch (error) {
       console.error("HOME DATA ERROR:", error);
-      setProducts([]);
+
+      setHomeData({
+        flash_sale: [],
+        best_deal: [],
+        trending: [],
+      });
+
       setCategories([]);
       setShops([]);
     } finally {
@@ -644,7 +736,9 @@ export default function HomePage() {
     navigate(route);
   };
 
-  const productSection = (start, end) => products.slice(start, end);
+  const goToProduct = (product) => {
+    requireLogin(`/products/${product.id}`);
+  };
 
   const goToShop = (shop) => {
     requireLogin(`/store/${shop.id}`);
@@ -652,6 +746,34 @@ export default function HomePage() {
 
   const firstCategoryRoute =
     categories.length > 0 ? categories[0].route : "/category/1";
+
+  const goToProductList = (type) => {
+    if (type === "flash_sale") {
+      requireLogin("/flash-sale");
+      return;
+    }
+
+    if (type === "trending") {
+      requireLogin("/trending");
+      return;
+    }
+
+    if (type === "best_deal") {
+      requireLogin("/best-deal");
+      return;
+    }
+
+    requireLogin(firstCategoryRoute);
+  };
+
+  const flashSaleProducts = homeData.flash_sale || [];
+  const bestDealProducts = homeData.best_deal || [];
+  const trendingProducts = homeData.trending || [];
+
+  const hasAnyProducts =
+    flashSaleProducts.length > 0 ||
+    bestDealProducts.length > 0 ||
+    trendingProducts.length > 0;
 
   return (
     <div style={{ background: "#f5f5f5", minHeight: "100vh" }}>
@@ -701,11 +823,11 @@ export default function HomePage() {
                 No categories found.
               </div>
             ) : (
-              categories.map((cat, i) => (
+              categories.map((cat, index) => (
                 <div
-                  key={i}
+                  key={cat.id || index}
                   onClick={() => {
-                    setActiveCategory(i);
+                    setActiveCategory(index);
                     requireLogin(cat.route);
                   }}
                   style={{
@@ -716,11 +838,12 @@ export default function HomePage() {
                     alignItems: "center",
                     gap: 8,
                     background:
-                      activeCategory === i ? "#FFF0F1" : "transparent",
-                    color: activeCategory === i ? COLORS.primary : COLORS.text,
-                    fontWeight: activeCategory === i ? 700 : 400,
+                      activeCategory === index ? "#FFF0F1" : "transparent",
+                    color:
+                      activeCategory === index ? COLORS.primary : COLORS.text,
+                    fontWeight: activeCategory === index ? 700 : 400,
                     borderLeft:
-                      activeCategory === i
+                      activeCategory === index
                         ? `3px solid ${COLORS.primary}`
                         : "3px solid transparent",
                     transition: "all 0.15s",
@@ -733,7 +856,7 @@ export default function HomePage() {
             )}
           </div>
 
-          <HeroBanner onAction={() => requireLogin(firstCategoryRoute)} />
+          <HeroBanner onAction={goToProductList} />
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div
@@ -764,14 +887,14 @@ export default function HomePage() {
                   gap: 4,
                 }}
               >
-                {BRANDS.map((b, i) => (
+                {BRANDS.map((brand, index) => (
                   <div
-                    key={i}
+                    key={index}
                     onClick={() =>
-                      requireLogin(`/brand/${b.name.toLowerCase()}`)
+                      requireLogin(`/brand/${brand.name.toLowerCase()}`)
                     }
                     style={{
-                      background: b.bg,
+                      background: brand.bg,
                       borderRadius: 5,
                       padding: "5px 2px",
                       textAlign: "center",
@@ -785,7 +908,7 @@ export default function HomePage() {
                         fontWeight: 800,
                       }}
                     >
-                      {b.name}
+                      {brand.name}
                     </div>
                   </div>
                 ))}
@@ -811,8 +934,9 @@ export default function HomePage() {
               >
                 🔥 FLASH SALE
               </div>
+
               <div style={{ color: "rgba(255,255,255,0.82)", fontSize: 10 }}>
-                Ends in 02:45:12
+                Discount products
               </div>
             </div>
           </div>
@@ -822,29 +946,9 @@ export default function HomePage() {
           <SectionTitle title="Featured Stores" />
 
           {loading ? (
-            <div
-              style={{
-                background: "#fff",
-                padding: 24,
-                borderRadius: 8,
-                color: COLORS.textMuted,
-                textAlign: "center",
-              }}
-            >
-              Loading shops...
-            </div>
+            <EmptyBox text="Loading shops..." />
           ) : shops.length === 0 ? (
-            <div
-              style={{
-                background: "#fff",
-                padding: 24,
-                borderRadius: 8,
-                color: COLORS.textMuted,
-                textAlign: "center",
-              }}
-            >
-              No shops found.
-            </div>
+            <EmptyBox text="No shops found." />
           ) : (
             <div
               style={{
@@ -853,11 +957,11 @@ export default function HomePage() {
                 gap: 12,
               }}
             >
-              {shops.slice(0, 4).map((shop, i) => (
+              {shops.slice(0, 4).map((shop, index) => (
                 <ShopCard
-                  key={shop.id || i}
+                  key={shop.id || index}
                   shop={shop}
-                  index={i}
+                  index={index}
                   onClick={goToShop}
                 />
               ))}
@@ -876,11 +980,11 @@ export default function HomePage() {
                 gap: 12,
               }}
             >
-              {shops.slice(4, 7).map((shop, i) => (
+              {shops.slice(4, 7).map((shop, index) => (
                 <PartnerShopCard
-                  key={shop.id || i}
+                  key={shop.id || index}
                   shop={shop}
-                  index={i}
+                  index={index}
                   onClick={goToShop}
                 />
               ))}
@@ -910,6 +1014,7 @@ export default function HomePage() {
             >
               LIMITED OFFER
             </div>
+
             <div
               style={{
                 color: "#fff",
@@ -918,10 +1023,11 @@ export default function HomePage() {
                 margin: "4px 0",
               }}
             >
-              Flash Sale — Up to 50% Off
+              Flash Sale — Discount Products
             </div>
+
             <div style={{ color: "rgba(255,255,255,0.78)", fontSize: 13 }}>
-              Electronics, Fashion, Home Essentials & more
+              Products with discount set by shop owners
             </div>
           </div>
 
@@ -943,78 +1049,91 @@ export default function HomePage() {
         </div>
 
         {loading ? (
-          <div
-            style={{
-              background: "#fff",
-              padding: 30,
-              borderRadius: 8,
-              textAlign: "center",
-              marginBottom: 28,
-              color: COLORS.textMuted,
-            }}
-          >
-            Loading products...
-          </div>
-        ) : products.length === 0 ? (
-          <div
-            style={{
-              background: "#fff",
-              padding: 30,
-              borderRadius: 8,
-              textAlign: "center",
-              marginBottom: 28,
-              color: COLORS.textMuted,
-            }}
-          >
-            No products found.
-          </div>
+          <EmptyBox text="Loading products..." />
+        ) : !hasAnyProducts ? (
+          <EmptyBox text="No products found." />
         ) : (
           <>
             <div style={{ marginBottom: 28 }}>
               <SectionTitle
-                title="You Might Want to Buy"
-                onLink={() => requireLogin(firstCategoryRoute)}
+                title="Flash Sale"
+                onLink={() => requireLogin("/flash-sale")}
               />
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(8, 1fr)",
-                  gap: 10,
-                }}
-              >
-                {productSection(0, 8).map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    compact
-                    onClick={() => requireLogin(`/product/${p.id}`)}
-                  />
-                ))}
-              </div>
+              {flashSaleProducts.length === 0 ? (
+                <EmptyBox text="No flash sale products yet." />
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(8, 1fr)",
+                    gap: 10,
+                  }}
+                >
+                  {flashSaleProducts.slice(0, 8).map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      compact
+                      onClick={goToProduct}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 28 }}>
+              <SectionTitle
+                title="Best Deal"
+                onLink={() => requireLogin("/best-deal")}
+              />
+
+              {bestDealProducts.length === 0 ? (
+                <EmptyBox text="No newest products yet." />
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(5, 1fr)",
+                    gap: 14,
+                  }}
+                >
+                  {bestDealProducts.slice(0, 10).map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onClick={goToProduct}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             <div style={{ marginBottom: 28 }}>
               <SectionTitle
                 title="Trending Now"
-                onLink={() => requireLogin(firstCategoryRoute)}
+                onLink={() => requireLogin("/trending")}
               />
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(5, 1fr)",
-                  gap: 14,
-                }}
-              >
-                {productSection(8, 18).map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    onClick={() => requireLogin(`/product/${p.id}`)}
-                  />
-                ))}
-              </div>
+              {trendingProducts.length === 0 ? (
+                <EmptyBox text="No trending products yet." />
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(5, 1fr)",
+                    gap: 14,
+                  }}
+                >
+                  {trendingProducts.slice(0, 10).map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onClick={goToProduct}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -1041,6 +1160,7 @@ export default function HomePage() {
             >
               NEW ARRIVAL
             </div>
+
             <div
               style={{
                 color: "#fff",
@@ -1051,40 +1171,16 @@ export default function HomePage() {
             >
               Discover New Products
             </div>
-            <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 13 }}>
-              New items from shop owners are available now
-            </div>
-          </div>
 
-          <div style={{ display: "flex", gap: 12 }}>
-            {[
-              ["48", "HRS"],
-              ["23", "MIN"],
-              ["07", "SEC"],
-            ].map(([n, l]) => (
-              <div
-                key={l}
-                style={{
-                  textAlign: "center",
-                  background: "rgba(255,255,255,0.12)",
-                  padding: "8px 14px",
-                  borderRadius: 8,
-                }}
-              >
-                <div style={{ color: "#fff", fontSize: 22, fontWeight: 900 }}>
-                  {n}
-                </div>
-                <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 10 }}>
-                  {l}
-                </div>
-              </div>
-            ))}
+            <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 13 }}>
+              Newest products appear in Best Deal
+            </div>
           </div>
 
           <button
             onClick={() => {
-              if (products.length > 0) {
-                requireLogin(`/product/${products[0].id}`);
+              if (bestDealProducts.length > 0) {
+                requireLogin(`/products/${bestDealProducts[0].id}`);
               } else {
                 requireLogin(firstCategoryRoute);
               }
@@ -1103,32 +1199,25 @@ export default function HomePage() {
             Grab Deal
           </button>
         </div>
-
-        {!loading && products.length > 18 && (
-          <div style={{ marginBottom: 28 }}>
-            <SectionTitle
-              title="More Products"
-              onLink={() => requireLogin(firstCategoryRoute)}
-            />
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(5, 1fr)",
-                gap: 14,
-              }}
-            >
-              {productSection(18, 28).map((p) => (
-                <ProductCard
-                  key={p.id}
-                  product={p}
-                  onClick={() => requireLogin(`/product/${p.id}`)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+    </div>
+  );
+}
+
+function EmptyBox({ text }) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        padding: 24,
+        borderRadius: 8,
+        color: COLORS.textMuted,
+        textAlign: "center",
+        border: `1px solid ${COLORS.border}`,
+        marginBottom: 12,
+      }}
+    >
+      {text}
     </div>
   );
 }

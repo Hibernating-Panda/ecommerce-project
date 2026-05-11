@@ -25,23 +25,29 @@ const DashboardPage = () => {
       <Navbar />
 
       <main style={styles.main}>
+        {/* HERO */}
         <section style={styles.heroCard}>
           <div>
             <div style={styles.badge}>Customer Account</div>
+
             <h1 style={styles.heroTitle}>
               Welcome back, {user?.name || "Customer"} 👋
             </h1>
+
             <p style={styles.heroText}>
-              Manage your profile, view your orders, and continue shopping from
-              your personal dashboard.
+              Manage your profile, check your orders, view your wishlist, and
+              continue shopping from your customer dashboard.
             </p>
 
             <div style={styles.heroActions}>
-              <button style={styles.primaryButton} onClick={() => navigate("/home")}>
+              <button style={styles.primaryButton} onClick={() => navigate("/")}>
                 Browse Store
               </button>
 
-              <button style={styles.lightButton} onClick={() => navigate("/orders")}>
+              <button
+                style={styles.lightButton}
+                onClick={() => navigate("/customer/orders")}
+              >
                 View Orders
               </button>
             </div>
@@ -52,14 +58,36 @@ const DashboardPage = () => {
           </div>
         </section>
 
+        {/* STATS */}
         <section style={styles.statsGrid}>
-          <StatCard icon="📦" title="Orders" value="0" text="Total purchases" />
-          <StatCard icon="❤️" title="Wishlist" value="0" text="Saved products" />
-          <StatCard icon="🎟️" title="Coupons" value="0" text="Available deals" />
-          <StatCard icon="⭐" title="Reviews" value="0" text="Your feedback" />
+          <StatCard
+            icon="📦"
+            title="Orders"
+            value="0"
+            text="View your purchases"
+            onClick={() => navigate("/customer/orders")}
+          />
+
+          <StatCard
+            icon="❤️"
+            title="Wishlist"
+            value="0"
+            text="Saved products"
+            onClick={() => navigate("/customer/wishlist")}
+          />
+
+          <StatCard
+            icon="⭐"
+            title="Reviews"
+            value="0"
+            text="Shop and product reviews"
+            onClick={() => navigate("/customer/reviews")}
+          />
         </section>
 
+        {/* MAIN CONTENT */}
         <section style={styles.contentGrid}>
+          {/* PROFILE */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
@@ -67,7 +95,10 @@ const DashboardPage = () => {
                 <p style={styles.cardSubtitle}>Your account details</p>
               </div>
 
-              <button style={styles.smallButton} onClick={() => navigate("/profile")}>
+              <button
+                style={styles.smallButton}
+                onClick={() => navigate("/customer/profile")}
+              >
                 Edit
               </button>
             </div>
@@ -91,6 +122,7 @@ const DashboardPage = () => {
             </div>
           </div>
 
+          {/* QUICK ACTIONS */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
@@ -104,33 +136,41 @@ const DashboardPage = () => {
                 icon="🛒"
                 title="Continue Shopping"
                 text="Browse products from available shops."
-                onClick={() => navigate("/home")}
+                onClick={() => navigate("/")}
               />
 
               <ActionItem
                 icon="📦"
                 title="My Orders"
                 text="Track your order status and history."
-                onClick={() => navigate("/orders")}
+                onClick={() => navigate("/customer/orders")}
               />
 
               <ActionItem
-                icon="👤"
-                title="Edit Profile"
-                text="Update your account information."
-                onClick={() => navigate("/profile")}
+                icon="❤️"
+                title="My Wishlist"
+                text="View products you saved for later."
+                onClick={() => navigate("/customer/wishlist")}
+              />
+
+              <ActionItem
+                icon="⭐"
+                title="My Reviews"
+                text="View and manage your shop and product reviews."
+                onClick={() => navigate("/customer/reviews")}
               />
 
               <ActionItem
                 icon="🔐"
                 title="Security"
                 text="Review login and account security."
-                onClick={() => navigate("/settings")}
+                onClick={() => navigate("/customer/settings")}
               />
             </div>
           </div>
         </section>
 
+        {/* STATUS */}
         <section style={styles.statusCard}>
           <div style={styles.statusIcon}>✅</div>
 
@@ -138,7 +178,8 @@ const DashboardPage = () => {
             <h3 style={styles.statusTitle}>You are successfully logged in</h3>
             <p style={styles.statusText}>
               Your session is active. You can browse products, manage your
-              account, and access protected customer features.
+              account, view wishlist items, check orders, and review shops or
+              products.
             </p>
           </div>
         </section>
@@ -147,16 +188,17 @@ const DashboardPage = () => {
   );
 };
 
-function StatCard({ icon, title, value, text }) {
+function StatCard({ icon, title, value, text, onClick }) {
   return (
-    <div style={styles.statCard}>
+    <button style={styles.statCard} onClick={onClick}>
       <div style={styles.statIcon}>{icon}</div>
-      <div>
+
+      <div style={{ textAlign: "left" }}>
         <p style={styles.statTitle}>{title}</p>
         <h2 style={styles.statValue}>{value}</h2>
         <p style={styles.statText}>{text}</p>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -206,7 +248,8 @@ const styles = {
   },
 
   heroCard: {
-    background: "linear-gradient(135deg, #111827 0%, #1f2937 55%, #E8192C 100%)",
+    background:
+      "linear-gradient(135deg, #111827 0%, #1f2937 55%, #E8192C 100%)",
     borderRadius: 24,
     padding: "34px 38px",
     color: COLORS.white,
@@ -292,7 +335,7 @@ const styles = {
 
   statsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
+    gridTemplateColumns: "repeat(3, 1fr)",
     gap: 16,
     marginBottom: 22,
   },
@@ -306,6 +349,9 @@ const styles = {
     gap: 14,
     alignItems: "center",
     boxShadow: "0 8px 24px rgba(15,23,42,0.05)",
+    cursor: "pointer",
+    width: "100%",
+    transition: "all 0.2s",
   },
 
   statIcon: {
@@ -317,6 +363,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     fontSize: 24,
+    flexShrink: 0,
   },
 
   statTitle: {

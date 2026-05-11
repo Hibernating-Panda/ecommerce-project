@@ -1,8 +1,12 @@
 import axios from "axios";
 
+export const API_URL = "http://127.0.0.1:8000/api";
+
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api",
-  // baseURL: "http://127.0.0.1:8000/api",
+  baseURL: API_URL,
+  headers: {
+    Accept: "application/json",
+  },
 });
 
 // Add authentication header to every request
@@ -19,6 +23,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// For pages using normal fetch()
+export const authHeaders = () => {
+  const token = localStorage.getItem("token");
+
+  return {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  };
+};
+
 // Handle unauthorized responses
 api.interceptors.response.use(
   (response) => response,
@@ -34,9 +49,14 @@ api.interceptors.response.use(
       localStorage.removeItem("token");
       localStorage.removeItem("user");
 
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
+      window.dispatchEvent(
+        new CustomEvent("openAuthPopup", {
+          detail: {
+            type: "login",
+            message: "Login to continue",
+          },
+        })
+      );
     }
 
     return Promise.reject(error);

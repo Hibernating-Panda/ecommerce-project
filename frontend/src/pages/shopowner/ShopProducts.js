@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import api from "../../api/api";
+import api from "../../services/api";
 import PopupMessage from "../../components/common/PopupMessage";
 import ConfirmPopup from "../../components/common/ConfirmPopup";
 

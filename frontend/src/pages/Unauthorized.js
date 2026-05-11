@@ -18,7 +18,7 @@ function Unauthorized() {
       return "/delivery";
     }
 
-    return "/home";
+    return "/";
   };
 
   const getBackText = () => {

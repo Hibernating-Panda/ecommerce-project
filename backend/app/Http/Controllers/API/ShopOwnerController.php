@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use App\Models\Category;
+use App\Models\ProductSize;
+use Illuminate\Support\Carbon;
 
 class ShopOwnerController extends Controller
 {
@@ -33,17 +35,28 @@ class ShopOwnerController extends Controller
     {
         $shop = $this->getShop($request);
 
+        $filter = $request->query('filter', 'day');
+
+        $startDate = match ($filter) {
+            'week' => Carbon::now()->startOfWeek(),
+            'month' => Carbon::now()->startOfMonth(),
+            default => Carbon::now()->startOfDay(),
+        };
+
+        $ordersQuery = Order::where('shop_id', $shop->id)
+            ->where('created_at', '>=', $startDate);
+
         $totalProducts = Product::where('shop_id', $shop->id)->count();
 
-        $pendingOrders = Order::where('shop_id', $shop->id)
+        $pendingOrders = (clone $ordersQuery)
             ->where('status', 'Pending')
             ->count();
 
-        $completedOrders = Order::where('shop_id', $shop->id)
+        $completedOrders = (clone $ordersQuery)
             ->where('status', 'Completed')
             ->count();
 
-        $totalSales = Order::where('shop_id', $shop->id)
+        $totalSales = (clone $ordersQuery)
             ->where('status', 'Completed')
             ->sum('total');
 
@@ -54,6 +67,7 @@ class ShopOwnerController extends Controller
 
         return response()->json([
             'shop' => $shop,
+            'filter' => $filter,
             'total_products' => $totalProducts,
             'pending_orders' => $pendingOrders,
             'completed_orders' => $completedOrders,
@@ -66,7 +80,7 @@ class ShopOwnerController extends Controller
     {
         $shop = $this->getShop($request);
 
-        $products = Product::with('category')
+        $products = Product::with(['category', 'sizes'])
             ->where('shop_id', $shop->id)
             ->latest()
             ->get();
@@ -86,6 +100,15 @@ class ShopOwnerController extends Controller
             'image' => 'nullable|string',
             'description' => 'nullable|string',
             'status' => 'required|in:Active,Inactive',
+
+            'sizes' => 'nullable|array',
+            'sizes.*.size' => 'required_with:sizes|string|max:50',
+            'sizes.*.price' => 'required_with:sizes|numeric|min:0',
+            'sizes.*.stock' => 'required_with:sizes|integer|min:0',
+
+            'discount_percent' => 'nullable|numeric|min:0|max:100',
+            'discount_start' => 'nullable|date',
+            'discount_end' => 'nullable|date|after_or_equal:discount_start',
         ]);
 
         $product = Product::create([
@@ -97,11 +120,24 @@ class ShopOwnerController extends Controller
             'image' => $validated['image'] ?? null,
             'description' => $validated['description'] ?? null,
             'status' => $validated['status'],
+            'discount_percent' => $validated['discount_percent'] ?? 0,
+            'discount_start' => $validated['discount_start'] ?? null,
+            'discount_end' => $validated['discount_end'] ?? null,
         ]);
+
+        if (!empty($validated['sizes'])) {
+            foreach ($validated['sizes'] as $size) {
+                $product->sizes()->create([
+                    'size' => $size['size'],
+                    'price' => $size['price'],
+                    'stock' => $size['stock'],
+                ]);
+            }
+        }
 
         return response()->json([
             'message' => 'Product created successfully.',
-            'product' => $product,
+            'product' => $product->load(['category', 'sizes']),
         ], 201);
     }
 
@@ -109,7 +145,7 @@ class ShopOwnerController extends Controller
     {
         $shop = $this->getShop($request);
 
-        $product = Product::with('category')
+        $product = Product::with(['category', 'sizes'])
             ->where('shop_id', $shop->id)
             ->where('id', $id)
             ->firstOrFail();
@@ -133,13 +169,45 @@ class ShopOwnerController extends Controller
             'image' => 'nullable|string',
             'description' => 'nullable|string',
             'status' => 'required|in:Active,Inactive',
+
+            'sizes' => 'nullable|array',
+            'sizes.*.size' => 'required_with:sizes|string|max:50',
+            'sizes.*.price' => 'required_with:sizes|numeric|min:0',
+            'sizes.*.stock' => 'required_with:sizes|integer|min:0',
+
+            'discount_percent' => 'nullable|numeric|min:0|max:100',
+            'discount_start' => 'nullable|date',
+            'discount_end' => 'nullable|date|after_or_equal:discount_start',
         ]);
 
-        $product->update($validated);
+        $product->update([
+            'name' => $validated['name'],
+            'price' => $validated['price'],
+            'stock' => $validated['stock'],
+            'category_id' => $validated['category_id'] ?? null,
+            'image' => $validated['image'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'status' => $validated['status'],
+            'discount_percent' => $validated['discount_percent'] ?? 0,
+            'discount_start' => $validated['discount_start'] ?? null,
+            'discount_end' => $validated['discount_end'] ?? null,
+        ]);
+
+        $product->sizes()->delete();
+
+        if (!empty($validated['sizes'])) {
+            foreach ($validated['sizes'] as $size) {
+                $product->sizes()->create([
+                    'size' => $size['size'],
+                    'price' => $size['price'],
+                    'stock' => $size['stock'],
+                ]);
+            }
+        }
 
         return response()->json([
             'message' => 'Product updated successfully.',
-            'product' => $product,
+            'product' => $product->load(['category', 'sizes']),
         ]);
     }
 
@@ -215,6 +283,55 @@ class ShopOwnerController extends Controller
         return response()->json([
             'message' => 'Shop profile updated successfully.',
             'shop' => $shop,
+        ]);
+    }
+
+    public function sales(Request $request)
+    {
+        $shop = $this->getShop($request);
+
+        $filter = $request->query('filter', 'month');
+
+        $startDate = match ($filter) {
+            'day' => Carbon::now()->startOfDay(),
+            'week' => Carbon::now()->startOfWeek(),
+            'month' => Carbon::now()->startOfMonth(),
+            default => Carbon::now()->startOfMonth(),
+        };
+
+        $orders = Order::where('shop_id', $shop->id)
+            ->where('created_at', '>=', $startDate)
+            ->latest()
+            ->get();
+
+        $completedOrders = $orders->where('status', 'Completed');
+
+        $totalSales = $completedOrders->sum('total');
+        $totalOrders = $orders->count();
+        $completedCount = $completedOrders->count();
+        $cancelledCount = $orders->where('status', 'Cancelled')->count();
+
+        $bestSellingProduct = $completedOrders
+            ->groupBy('product_name')
+            ->map(function ($items, $productName) {
+                return [
+                    'product_name' => $productName,
+                    'quantity_sold' => $items->sum('quantity'),
+                    'total_sales' => $items->sum('total'),
+                ];
+            })
+            ->sortByDesc('quantity_sold')
+            ->values()
+            ->first();
+
+        return response()->json([
+            'filter' => $filter,
+            'total_sales' => $totalSales,
+            'total_orders' => $totalOrders,
+            'completed_orders' => $completedCount,
+            'cancelled_orders' => $cancelledCount,
+            'best_selling_product' => $bestSellingProduct,
+            'orders' => $orders,
         ]);
     }
 }
