@@ -1,23 +1,49 @@
-# E-Shop Project
+# Delivery Management & Live Tracking System
 
-A full-stack e-commerce application with Laravel backend and React frontend featuring complete authentication system.
+A modern, professional full-stack delivery management platform with real-time GPS tracking, role-based dashboards, and comprehensive order management.
 
-## 🚀 Quick Start
+## 🚀 Features
 
-### Prerequisites
-- PHP 8.0+
-- Composer
-- Node.js & npm
-- MySQL/MariaDB
-- Git
+### Core Features
+- ✅ **User Authentication** - Secure login/register with Sanctum JWT tokens
+- ✅ **Role-Based Access Control** - Admin, Delivery Person, Customer roles
+- ✅ **Order Management** - Create, track, and manage orders
+- ✅ **Live GPS Tracking** - Real-time driver location tracking
+- ✅ **Interactive Maps** - React Leaflet with OpenStreetMap integration
+- ✅ **Responsive UI** - Mobile, tablet, and desktop support
+- ✅ **Professional Dashboards** - Role-specific analytics and controls
 
-### 📋 Setup Instructions
+## 🛠️ Tech Stack
 
-#### 1. Clone the Repository
+- **Frontend:** React 19 + Vite + Tailwind CSS
+- **Backend:** Laravel 13 + MySQL
+- **Maps:** React Leaflet + OpenStreetMap
+- **Auth:** Laravel Sanctum
+
+## 📋 Quick Start
+
+### Backend Setup
 ```bash
-git clone <repository-url>
-cd ecommerce-project
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+php artisan serve
 ```
+
+### Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## 📚 Documentation
+
+- [SETUP_GUIDE.md](SETUP_GUIDE.md) - Detailed setup instructions
+- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Complete API reference
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
 
 #### 2. Backend Setup (Laravel)
 ```bash

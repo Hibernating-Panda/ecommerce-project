@@ -50,6 +50,39 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Get the role associated with this user
+     */
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Check if user has specific role
+     */
+    public function hasRole($role)
+    {
+        return $this->role->name === $role;
+    }
+
+    /**
+     * Get deliveries where user is the driver
+     */
+    public function deliveries()
+    {
+        return $this->hasMany(Delivery::class, 'driver_id');
+    }
+
+    /**
+     * Get notifications for this user
+     */
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class);
     }
 }

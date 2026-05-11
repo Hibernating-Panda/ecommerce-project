@@ -30,8 +30,20 @@ Route::middleware('auth:sanctum')->prefix('shopowner')->group(function () {
     Route::put('/profile', [ShopOwnerController::class, 'updateProfile']);
 });
 
+use App\Http\Controllers\API\DashboardController;
+use App\Http\Controllers\API\DeliveryController;
+use App\Http\Controllers\API\InvoiceController;
+use App\Http\Controllers\API\PaymentController;
+use App\Http\Controllers\API\RolePermissionController;
+use App\Http\Controllers\API\RouteOptimizationController;
+use App\Http\Controllers\API\TrackingController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\API\UserController;            
+
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+Route::post('/payments/stripe/webhook', [PaymentController::class, 'stripeWebhook']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -77,3 +89,59 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     
 });
 
+Route::middleware(['auth:sanctum', 'activity.log'])->group(function () {
+
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me',      [AuthController::class, 'me']);
+
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/dashboard/charts', [DashboardController::class, 'charts']);
+
+    // Users & Roles (admin only)
+    Route::middleware('permission:manage-users')->group(function () {
+        Route::apiResource('users', UserController::class);
+    });
+
+    // Roles & Permissions
+    Route::middleware('permission:manage-roles')->group(function () {
+        Route::apiResource('roles', RolePermissionController::class);
+        Route::post('/roles/{role}/permissions', [RolePermissionController::class, 'syncPermissions']);
+        Route::get('/permissions', [RolePermissionController::class, 'allPermissions']);
+    });
+
+    // Orders
+    Route::apiResource('orders', OrderController::class);
+    Route::post('/orders/{order}/assign', [OrderController::class, 'assignDeliveryMan']);
+    Route::post('/orders/{order}/status', [OrderController::class, 'updateStatus']);
+
+    // Deliveries
+    Route::apiResource('deliveries', DeliveryController::class);
+    Route::post('/deliveries/{delivery}/proof', [DeliveryController::class, 'uploadProof']);
+
+    // Payments
+    Route::get('/payments',                  [PaymentController::class, 'index']);
+    Route::post('/payments/stripe/intent',   [PaymentController::class, 'createStripeIntent']);
+    Route::post('/payments/stripe/confirm',  [PaymentController::class, 'confirmStripe']);
+    Route::post('/payments/khqr/generate',   [PaymentController::class, 'generateKHQR']);
+    Route::post('/payments/khqr/verify',     [PaymentController::class, 'verifyKHQR']);
+    Route::get('/payments/{payment}',        [PaymentController::class, 'show']);
+
+    // Live GPS Tracking
+    Route::get('/tracking/{order}',          [TrackingController::class, 'getLocation']);
+    Route::post('/tracking/update',          [TrackingController::class, 'updateLocation']);
+    Route::get('/tracking/history/{order}',  [TrackingController::class, 'history']);
+
+    // AI Route Optimization
+    Route::post('/routes/optimize',          [RouteOptimizationController::class, 'optimize']);
+    Route::get('/routes/delivery-man/{id}',  [RouteOptimizationController::class, 'getOptimizedRoute']);
+
+    // PDF Invoice
+    Route::get('/invoices/{order}/download', [InvoiceController::class, 'download']);
+    Route::get('/invoices/{order}/preview',  [InvoiceController::class, 'preview']);
+
+    // Activity Logs
+    Route::get('/activity-logs',             [ActivityLogController::class, 'index']);
+    Route::get('/activity-logs/export',      [ActivityLogController::class, 'export']);
+    Route::delete('/activity-logs/clear',    [ActivityLogController::class, 'clear']);
+});

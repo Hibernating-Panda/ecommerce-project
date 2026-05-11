@@ -34,5 +34,24 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+    'bakong'=> [
+        'url' => env('BAKONG_URL'),
+        'token' => env('BAKONG_TOKEN'),
+        'merchant_id' => env('BAKONG_MERCHANT_ID'),
+        'merchant_name' => env('BAKONG_MERCHANT_NAME'),
+    ],
+    'google' => [
+        'map_key' => env('GOOGLE_MAP_KEY'),
+        'project_id' => env('GOOGLE_PROJECT_ID'),
+    ],
+    'pusher' => [
+        'beams_instance_id' => env('PUSHER_BEAMS_INSTANCE_ID'),
+        'beams_secret_key' => env('PUSHER_BEAMS_SECRET_KEY'),
+    ]
 
 ];
