@@ -9,57 +9,53 @@ use Illuminate\Support\Facades\Hash;
 
 class AdminUserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::whereDoesntHave('roles', function ($query) {
-                $query->where('name', 'admin');
+        $users = User::with('roles')
+            ->whereDoesntHave('roles', fn ($query) => $query->where('name', 'admin'))
+            ->when($request->role, function ($query) use ($request) {
+                $query->whereHas('roles', fn ($roleQuery) => $roleQuery->where('name', $request->role));
             })
-            ->with('roles')
+            ->when($request->account_status, fn ($query) => $query->where('account_status', $request->account_status))
+            ->when($request->search, function ($query) use ($request) {
+                $query->where('name', 'LIKE', "%{$request->search}%")
+                    ->orWhere('email', 'LIKE', "%{$request->search}%")
+                    ->orWhere('phone', 'LIKE', "%{$request->search}%");
+            })
             ->latest()
-            ->get()
-            ->map(function ($user) {
-                return [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->getRoleNames()->first(),
-                    'account_status' => $user->account_status,
-                    'created_at' => $user->created_at,
-                ];
-            });
+            ->paginate($request->integer('per_page', 15));
+
+        $users->getCollection()->transform(fn ($user) => $this->formatUser($user));
 
         return response()->json($users);
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
-            'role' => 'required|in:shop_owner,user,delivery_man',
-            'account_status' => 'required|in:active,pending,rejected',
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:6'],
+            'role' => ['required', 'in:shop_owner,user,delivery_man'],
+            'account_status' => ['required', 'in:active,pending,rejected'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'address' => ['nullable', 'string', 'max:500'],
         ]);
 
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'account_status' => $request->account_status,
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'account_status' => $validated['account_status'],
         ]);
 
-        $user->assignRole($request->role);
+        $user->syncRoles([$validated['role']]);
 
         return response()->json([
-            'message' => 'User created successfully',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->getRoleNames()->first(),
-                'account_status' => $user->account_status,
-                'created_at' => $user->created_at,
-            ],
+            'message' => 'User created successfully.',
+            'user' => $this->formatUser($user->load('roles')),
         ], 201);
     }
 
@@ -67,57 +63,51 @@ class AdminUserController extends Controller
     {
         if ($user->hasRole('admin')) {
             return response()->json([
-                'message' => 'Admin users cannot be viewed here',
+                'message' => 'Admin users cannot be viewed here.',
             ], 403);
         }
 
-        return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->getRoleNames()->first(),
-            'account_status' => $user->account_status,
-            'created_at' => $user->created_at,
-        ]);
+        return response()->json(
+            $this->formatUser($user->load('roles'))
+        );
     }
 
     public function update(Request $request, User $user)
     {
         if ($user->hasRole('admin')) {
             return response()->json([
-                'message' => 'Admin users cannot be edited',
+                'message' => 'Admin users cannot be edited.',
             ], 403);
         }
 
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->id,
-            'role' => 'required|in:shop_owner,user,delivery_man',
-            'account_status' => 'required|in:active,pending,rejected',
-            'password' => 'nullable|min:6',
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'unique:users,email,' . $user->id],
+            'role' => ['required', 'in:shop_owner,user,delivery_man'],
+            'account_status' => ['required', 'in:active,pending,rejected'],
+            'password' => ['nullable', 'string', 'min:6'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'address' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $user->name = $request->name;
-        $user->email = $request->email;
-        $user->account_status = $request->account_status;
+        $user->update([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'account_status' => $validated['account_status'],
+            ...($request->filled('password') ? ['password' => Hash::make($validated['password'])] : []),
+        ]);
 
-        if ($request->filled('password')) {
-            $user->password = Hash::make($request->password);
+        $user->syncRoles([$validated['role']]);
+
+        if ($validated['account_status'] !== 'active') {
+            $user->tokens()->delete();
         }
 
-        $user->save();
-        $user->syncRoles([$request->role]);
-
         return response()->json([
-            'message' => 'User updated successfully',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->getRoleNames()->first(),
-                'account_status' => $user->account_status,
-                'created_at' => $user->created_at,
-            ],
+            'message' => 'User updated successfully.',
+            'user' => $this->formatUser($user->fresh()->load('roles')),
         ]);
     }
 
@@ -125,15 +115,17 @@ class AdminUserController extends Controller
     {
         if ($user->hasRole('admin')) {
             return response()->json([
-                'message' => 'Admin users cannot be changed here',
+                'message' => 'Admin users cannot be changed here.',
             ], 403);
         }
 
-        $user->account_status = 'active';
-        $user->save();
+        $user->update([
+            'account_status' => 'active',
+        ]);
 
         return response()->json([
-            'message' => 'User approved successfully',
+            'message' => 'User approved successfully.',
+            'user' => $this->formatUser($user->fresh()->load('roles')),
         ]);
     }
 
@@ -141,15 +133,19 @@ class AdminUserController extends Controller
     {
         if ($user->hasRole('admin')) {
             return response()->json([
-                'message' => 'Admin users cannot be changed here',
+                'message' => 'Admin users cannot be changed here.',
             ], 403);
         }
 
-        $user->account_status = 'rejected';
-        $user->save();
+        $user->update([
+            'account_status' => 'rejected',
+        ]);
+
+        $user->tokens()->delete();
 
         return response()->json([
-            'message' => 'User rejected successfully',
+            'message' => 'User rejected successfully.',
+            'user' => $this->formatUser($user->fresh()->load('roles')),
         ]);
     }
 
@@ -157,14 +153,32 @@ class AdminUserController extends Controller
     {
         if ($user->hasRole('admin')) {
             return response()->json([
-                'message' => 'Admin users cannot be deleted',
+                'message' => 'Admin users cannot be deleted.',
             ], 403);
         }
 
+        $user->tokens()->delete();
         $user->delete();
 
         return response()->json([
-            'message' => 'User deleted successfully',
+            'message' => 'User deleted successfully.',
         ]);
+    }
+
+    private function formatUser(User $user): array
+    {
+        $user->loadMissing('roles');
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'address' => $user->address,
+            'profile_image' => $user->profile_image,
+            'role' => $user->roles->first()?->name ?? 'user',
+            'account_status' => $user->account_status,
+            'created_at' => $user->created_at,
+        ];
     }
 }

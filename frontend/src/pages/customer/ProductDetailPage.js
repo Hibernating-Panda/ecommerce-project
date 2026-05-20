@@ -5,12 +5,16 @@ import { useAuth } from "../../context/AuthContext";
 import { API_URL, authHeaders } from "../../services/api";
 
 const COLORS = {
-  primary: "#E8192C",
+  primary: "#16a34a",
+  primaryDark: "#166534",
+  primaryLight: "#dcfce7",
   dark: "#111827",
   muted: "#6b7280",
-  border: "#e5e7eb",
-  bg: "#f4f6fb",
+  border: "#bbf7d0",
+  softBorder: "#e5e7eb",
+  bg: "#f0fdf4",
   white: "#ffffff",
+  red: "#dc2626",
 };
 
 const ProductDetailPage = () => {
@@ -57,14 +61,14 @@ const ProductDetailPage = () => {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Failed to load product");
+        throw new Error(data.message || "Failed to load product.");
       }
 
       setProduct(data.product);
       setProductReviews(data.product_reviews || []);
       setShopReviews(data.shop_reviews || []);
     } catch (error) {
-      showMessage(error.message || "Something went wrong");
+      showMessage(error.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -72,15 +76,18 @@ const ProductDetailPage = () => {
 
   const requireLogin = () => {
     if (!user) {
-      navigate("/login", {
-        state: {
-          message: "Login to continue",
-        },
-      });
+      window.dispatchEvent(
+        new CustomEvent("openAuthPopup", {
+          detail: {
+            type: "login",
+            message: "Login to continue",
+          },
+        })
+      );
       return false;
     }
 
-    if (user.role !== "user") {
+    if (user.role !== "user" && user.role !== "customer") {
       showMessage("Only customers can use this function.");
       return false;
     }
@@ -106,12 +113,12 @@ const ProductDetailPage = () => {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Failed to add to cart");
+        throw new Error(data.message || "Failed to add to cart.");
       }
 
       showMessage("Product added to cart.");
     } catch (error) {
-      showMessage(error.message || "Failed to add to cart");
+      showMessage(error.message || "Failed to add to cart.");
     } finally {
       setCartLoading(false);
     }
@@ -134,7 +141,7 @@ const ProductDetailPage = () => {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Failed to update wishlist");
+        throw new Error(data.message || "Failed to update wishlist.");
       }
 
       setProduct((prev) => ({
@@ -144,7 +151,7 @@ const ProductDetailPage = () => {
 
       showMessage(data.message || "Wishlist updated.");
     } catch (error) {
-      showMessage(error.message || "Failed to update wishlist");
+      showMessage(error.message || "Failed to update wishlist.");
     } finally {
       setWishlistLoading(false);
     }
@@ -169,7 +176,7 @@ const ProductDetailPage = () => {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Failed to submit product review");
+        throw new Error(data.message || "Failed to submit product review.");
       }
 
       setProductComment("");
@@ -177,7 +184,7 @@ const ProductDetailPage = () => {
       showMessage("Product review submitted.");
       fetchProduct();
     } catch (error) {
-      showMessage(error.message || "Failed to submit product review");
+      showMessage(error.message || "Failed to submit product review.");
     }
   };
 
@@ -200,7 +207,7 @@ const ProductDetailPage = () => {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Failed to submit shop review");
+        throw new Error(data.message || "Failed to submit shop review.");
       }
 
       setShopComment("");
@@ -208,7 +215,7 @@ const ProductDetailPage = () => {
       showMessage("Shop review submitted.");
       fetchProduct();
     } catch (error) {
-      showMessage(error.message || "Failed to submit shop review");
+      showMessage(error.message || "Failed to submit shop review.");
     }
   };
 
@@ -216,6 +223,7 @@ const ProductDetailPage = () => {
     return (
       <div style={styles.page}>
         <Navbar />
+
         <main style={styles.main}>
           <div style={styles.card}>Loading product...</div>
         </main>
@@ -227,6 +235,7 @@ const ProductDetailPage = () => {
     return (
       <div style={styles.page}>
         <Navbar />
+
         <main style={styles.main}>
           <div style={styles.card}>Product not found.</div>
         </main>
@@ -247,7 +256,7 @@ const ProductDetailPage = () => {
       {message && <div style={styles.toast}>{message}</div>}
 
       <main style={styles.main}>
-        <button style={styles.backButton} onClick={() => navigate("/")}>
+        <button type="button" style={styles.backButton} onClick={() => navigate("/")}>
           ← Back to Store
         </button>
 
@@ -257,7 +266,9 @@ const ProductDetailPage = () => {
           </div>
 
           <div style={styles.infoCard}>
-            <p style={styles.shopName}>{product.shop?.name || "Shop"}</p>
+            <p style={styles.shopName}>
+              {product.shop?.shop_name || product.shop?.name || "Shop"}
+            </p>
 
             <h1 style={styles.productName}>{product.name}</h1>
 
@@ -267,7 +278,9 @@ const ProductDetailPage = () => {
 
             <div style={styles.priceBox}>
               <span style={styles.priceLabel}>Price</span>
-              <strong style={styles.price}>${Number(product.price).toFixed(2)}</strong>
+              <strong style={styles.price}>
+                ${Number(product.price || 0).toFixed(2)}
+              </strong>
             </div>
 
             {product.discount_price && (
@@ -290,6 +303,7 @@ const ProductDetailPage = () => {
 
             <div style={styles.actions}>
               <button
+                type="button"
                 style={styles.primaryButton}
                 onClick={handleAddToCart}
                 disabled={cartLoading}
@@ -298,6 +312,7 @@ const ProductDetailPage = () => {
               </button>
 
               <button
+                type="button"
                 style={styles.secondaryButton}
                 onClick={handleToggleWishlist}
                 disabled={wishlistLoading}
@@ -310,6 +325,7 @@ const ProductDetailPage = () => {
               </button>
 
               <button
+                type="button"
                 style={styles.lightButton}
                 onClick={() => navigate("/customer/cart")}
               >
@@ -346,12 +362,15 @@ const ProductDetailPage = () => {
                 required
               />
 
-              <button style={styles.primaryButton} type="submit">
+              <button type="submit" style={styles.primaryButton}>
                 Submit Product Review
               </button>
             </form>
 
-            <ReviewList reviews={productReviews} emptyText="No product reviews yet." />
+            <ReviewList
+              reviews={productReviews}
+              emptyText="No product reviews yet."
+            />
           </div>
 
           <div style={styles.card}>
@@ -380,7 +399,7 @@ const ProductDetailPage = () => {
                 required
               />
 
-              <button style={styles.primaryButton} type="submit">
+              <button type="submit" style={styles.primaryButton}>
                 Submit Shop Review
               </button>
             </form>
@@ -419,13 +438,13 @@ const styles = {
     minHeight: "100vh",
     background: COLORS.bg,
   },
-
   main: {
+    width: "100%",
     maxWidth: 1200,
     margin: "0 auto",
-    padding: "28px 20px 50px",
+    padding: "clamp(18px, 3vw, 32px)",
+    boxSizing: "border-box",
   },
-
   toast: {
     position: "fixed",
     top: 90,
@@ -438,7 +457,6 @@ const styles = {
     boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
     fontWeight: 800,
   },
-
   backButton: {
     background: COLORS.white,
     border: `1px solid ${COLORS.border}`,
@@ -449,14 +467,12 @@ const styles = {
     fontWeight: 800,
     marginBottom: 18,
   },
-
   productGrid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
     gap: 24,
     marginBottom: 24,
   },
-
   imageCard: {
     background: COLORS.white,
     borderRadius: 22,
@@ -464,60 +480,55 @@ const styles = {
     border: `1px solid ${COLORS.border}`,
     boxShadow: "0 8px 24px rgba(15,23,42,0.05)",
   },
-
   productImage: {
     width: "100%",
-    height: 520,
+    height: "min(520px, 70vw)",
+    minHeight: 300,
     objectFit: "cover",
     borderRadius: 16,
     background: "#f9fafb",
   },
-
   infoCard: {
     background: COLORS.white,
     borderRadius: 22,
-    padding: 24,
+    padding: "clamp(18px, 3vw, 24px)",
     border: `1px solid ${COLORS.border}`,
     boxShadow: "0 8px 24px rgba(15,23,42,0.05)",
+    minWidth: 0,
   },
-
   shopName: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     fontWeight: 900,
     margin: 0,
   },
-
   productName: {
     margin: "10px 0",
     color: COLORS.dark,
-    fontSize: 34,
+    fontSize: "clamp(28px, 4vw, 38px)",
   },
-
   description: {
     color: COLORS.muted,
     lineHeight: 1.7,
   },
-
   priceBox: {
     marginTop: 18,
     padding: 16,
-    background: "#fff0f1",
+    background: COLORS.primaryLight,
     borderRadius: 16,
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
   },
-
   priceLabel: {
     color: COLORS.muted,
     fontWeight: 800,
   },
-
   price: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     fontSize: 26,
   },
-
   discountBox: {
     marginTop: 12,
     background: "#ecfdf5",
@@ -526,18 +537,15 @@ const styles = {
     borderRadius: 12,
     fontWeight: 800,
   },
-
   quantityBox: {
     marginTop: 18,
   },
-
   label: {
     display: "block",
     marginBottom: 8,
     color: COLORS.dark,
     fontWeight: 800,
   },
-
   quantityInput: {
     width: 100,
     border: `1px solid ${COLORS.border}`,
@@ -545,14 +553,12 @@ const styles = {
     padding: "10px 12px",
     fontSize: 15,
   },
-
   actions: {
     display: "flex",
     flexWrap: "wrap",
     gap: 12,
     marginTop: 22,
   },
-
   primaryButton: {
     background: COLORS.primary,
     color: COLORS.white,
@@ -562,9 +568,8 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
   },
-
   secondaryButton: {
-    background: COLORS.dark,
+    background: COLORS.primaryDark,
     color: COLORS.white,
     border: "none",
     padding: "12px 18px",
@@ -572,7 +577,6 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
   },
-
   lightButton: {
     background: COLORS.white,
     color: COLORS.dark,
@@ -582,74 +586,65 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
   },
-
   reviewGrid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
     gap: 24,
   },
-
   card: {
     background: COLORS.white,
     border: `1px solid ${COLORS.border}`,
     borderRadius: 20,
-    padding: 22,
+    padding: "clamp(18px, 2.5vw, 22px)",
     boxShadow: "0 8px 24px rgba(15,23,42,0.05)",
   },
-
   sectionTitle: {
     marginTop: 0,
     color: COLORS.dark,
   },
-
   reviewForm: {
     display: "flex",
     flexDirection: "column",
     gap: 10,
     marginBottom: 22,
   },
-
   input: {
     border: `1px solid ${COLORS.border}`,
     borderRadius: 12,
     padding: "11px 12px",
+    background: COLORS.white,
   },
-
   textarea: {
     border: `1px solid ${COLORS.border}`,
     borderRadius: 12,
     padding: "11px 12px",
     minHeight: 100,
     resize: "vertical",
+    fontFamily: "inherit",
   },
-
   reviewList: {
     display: "flex",
     flexDirection: "column",
     gap: 12,
   },
-
   reviewItem: {
-    borderTop: "1px solid #f1f1f1",
+    borderTop: `1px solid ${COLORS.softBorder}`,
     paddingTop: 12,
   },
-
   reviewTop: {
     display: "flex",
     justifyContent: "space-between",
     gap: 12,
+    flexWrap: "wrap",
   },
-
   rating: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     fontWeight: 900,
   },
-
   reviewComment: {
     color: COLORS.muted,
     lineHeight: 1.6,
   },
-
   emptyText: {
     color: COLORS.muted,
     background: "#f9fafb",

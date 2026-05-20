@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Notification extends Model
 {
@@ -17,7 +16,7 @@ class Notification extends Model
         'notifiable_id',
         'notifiable_type',
         'is_read',
-        'read_at'
+        'read_at',
     ];
 
     protected $casts = [
@@ -25,30 +24,21 @@ class Notification extends Model
         'read_at' => 'datetime',
     ];
 
-    /**
-     * Get the user associated with this notification
-     */
-    public function user(): BelongsTo
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the notifiable entity (Order, Delivery, etc.)
-     */
     public function notifiable()
     {
         return $this->morphTo();
     }
 
-    /**
-     * Mark notification as read
-     */
     public function markAsRead()
     {
-        $this->update([
+        return $this->update([
             'is_read' => true,
-            'read_at' => now()
+            'read_at' => now(),
         ]);
     }
 }

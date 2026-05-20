@@ -5,18 +5,23 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
 const COLORS = {
-  primary: "#E8192C",
-  purple: "#534AB7",
-  text: "#1a1a1a",
-  textMuted: "#888",
-  border: "#eee",
-  white: "#fff",
+  primary: "#16a34a",
+  primaryDark: "#166534",
+  primaryLight: "#dcfce7",
+  blue: "#2563eb",
+  orange: "#f97316",
+  text: "#111827",
+  textMuted: "#6b7280",
+  border: "#bbf7d0",
+  softBorder: "#e5e7eb",
+  bg: "#f0fdf4",
+  white: "#ffffff",
 };
 
 const HERO_SLIDES = [
   {
-    bg: "linear-gradient(135deg,#1428A0,#185FA5)",
-    accent: "#E8192C",
+    bg: "linear-gradient(135deg,#166534,#16a34a)",
+    accent: "#facc15",
     badge: "BEST DEAL",
     title: "Newest Products",
     subtitle: "Discover the latest items from real shops",
@@ -24,8 +29,8 @@ const HERO_SLIDES = [
     target: "best_deal",
   },
   {
-    bg: "linear-gradient(135deg,#E8192C,#FF6B35)",
-    accent: "rgba(255,255,255,0.25)",
+    bg: "linear-gradient(135deg,#15803d,#22c55e)",
+    accent: "#ffffff",
     badge: "FLASH SALE",
     title: "Discount Deals Today",
     subtitle: "Products with discounts from shop owners",
@@ -33,8 +38,8 @@ const HERO_SLIDES = [
     target: "flash_sale",
   },
   {
-    bg: "linear-gradient(135deg,#0d7a3f,#1DB954)",
-    accent: "#F6AD55",
+    bg: "linear-gradient(135deg,#0f766e,#14b8a6)",
+    accent: "#facc15",
     badge: "TRENDING",
     title: "Most Sold Products",
     subtitle: "Popular products customers are buying",
@@ -96,11 +101,7 @@ function getProductImage(product) {
 
 function getProductPrice(product) {
   const price = Number(product?.price || 0);
-
-  const discountPercent = Number(
-    product?.discount_percent || product?.discount || 0
-  );
-
+  const discountPercent = Number(product?.discount_percent || product?.discount || 0);
   const discountPrice = Number(product?.discount_price || 0);
 
   if (discountPrice > 0 && discountPrice < price) {
@@ -112,11 +113,9 @@ function getProductPrice(product) {
   }
 
   if (discountPercent > 0) {
-    const finalPrice = price - price * (discountPercent / 100);
-
     return {
       originalPrice: price,
-      finalPrice,
+      finalPrice: price - price * (discountPercent / 100),
       discount: discountPercent,
     };
   }
@@ -129,15 +128,11 @@ function getProductPrice(product) {
 }
 
 function formatRating(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
+  if (value === null || value === undefined || value === "") return null;
 
   const number = Number(value);
 
-  if (Number.isNaN(number)) {
-    return null;
-  }
+  if (Number.isNaN(number)) return null;
 
   return number.toFixed(1);
 }
@@ -156,108 +151,45 @@ function HeroBanner({ onAction }) {
   const slide = HERO_SLIDES[active];
 
   return (
-    <div
-      style={{
-        borderRadius: 10,
-        overflow: "hidden",
-        position: "relative",
-        height: 210,
-        background: slide.bg,
-        transition: "background 0.6s",
-        display: "flex",
-        alignItems: "center",
-        padding: "0 32px",
-      }}
-    >
-      <div style={{ zIndex: 1, flex: 1 }}>
+    <div style={{ ...styles.hero, background: slide.bg }}>
+      <div style={styles.heroContent}>
         <div
           style={{
-            display: "inline-block",
+            ...styles.heroBadge,
             background: slide.accent,
-            color: "#fff",
-            fontSize: 10,
-            fontWeight: 800,
-            letterSpacing: 1.5,
-            padding: "3px 10px",
-            borderRadius: 3,
-            marginBottom: 8,
+            color: slide.accent === "#ffffff" ? COLORS.primaryDark : COLORS.text,
           }}
         >
           {slide.badge}
         </div>
 
-        <h2
-          style={{
-            color: "#fff",
-            fontSize: 26,
-            fontWeight: 900,
-            margin: "0 0 6px",
-          }}
-        >
-          {slide.title}
-        </h2>
-
-        <p
-          style={{
-            color: "rgba(255,255,255,0.75)",
-            fontSize: 13,
-            margin: "0 0 16px",
-          }}
-        >
-          {slide.subtitle}
-        </p>
+        <h2 style={styles.heroTitle}>{slide.title}</h2>
+        <p style={styles.heroSubtitle}>{slide.subtitle}</p>
 
         <button
           onClick={() => onAction(slide.target)}
           style={{
+            ...styles.heroButton,
             background: slide.accent,
-            color: "#fff",
-            border: "none",
-            padding: "9px 22px",
-            borderRadius: 6,
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
+            color: slide.accent === "#ffffff" ? COLORS.primaryDark : COLORS.text,
           }}
         >
           {slide.cta} →
         </button>
       </div>
 
-      <div
-        style={{
-          position: "absolute",
-          right: 20,
-          bottom: 0,
-          fontSize: 100,
-          opacity: 0.1,
-        }}
-      >
-        🛍️
-      </div>
+      <div style={styles.heroIcon}>🛍️</div>
 
-      <div
-        style={{
-          position: "absolute",
-          bottom: 12,
-          left: "50%",
-          transform: "translateX(-50%)",
-          display: "flex",
-          gap: 5,
-        }}
-      >
+      <div style={styles.heroDots}>
         {HERO_SLIDES.map((_, index) => (
-          <div
+          <button
             key={index}
+            type="button"
             onClick={() => setActive(index)}
             style={{
-              width: index === active ? 20 : 6,
-              height: 6,
-              borderRadius: 3,
-              background:
-                index === active ? "#fff" : "rgba(255,255,255,0.38)",
-              cursor: "pointer",
-              transition: "all 0.3s",
+              ...styles.heroDot,
+              width: index === active ? 22 : 7,
+              background: index === active ? "#ffffff" : "rgba(255,255,255,0.45)",
             }}
           />
         ))}
@@ -268,30 +200,13 @@ function HeroBanner({ onAction }) {
 
 function SectionTitle({ title, onLink }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: 12,
-      }}
-    >
-      <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>
-        {title}
-      </h3>
+    <div style={styles.sectionHeader}>
+      <h3 style={styles.sectionTitle}>{title}</h3>
 
       {onLink && (
-        <span
-          onClick={onLink}
-          style={{
-            fontSize: 12,
-            color: COLORS.primary,
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
+        <button type="button" onClick={onLink} style={styles.sectionLink}>
           See all →
-        </span>
+        </button>
       )}
     </div>
   );
@@ -304,8 +219,7 @@ function ProductCard({ product, compact, onClick }) {
   const { originalPrice, finalPrice, discount } = getProductPrice(product);
 
   const rating = formatRating(product.average_rating);
-  const reviewCount =
-    product.reviews_count || product.product_reviews_count || 0;
+  const reviewCount = product.reviews_count || product.product_reviews_count || 0;
   const sold = product.sold || product.total_sold || product.quantity_sold || 0;
   const hue = ((product.id || 1) * 37) % 360;
 
@@ -315,121 +229,65 @@ function ProductCard({ product, compact, onClick }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: COLORS.white,
-        borderRadius: 8,
-        border: `1px solid ${COLORS.border}`,
-        padding: compact ? 8 : 10,
-        cursor: "pointer",
+        ...styles.productCard,
+        padding: compact ? 10 : 12,
         boxShadow: hovered
-          ? "0 6px 18px rgba(232,25,44,0.14)"
-          : "0 1px 2px rgba(0,0,0,0.02)",
-        transform: hovered ? "translateY(-2px)" : "translateY(0)",
-        transition: "all 0.2s",
+          ? "0 8px 22px rgba(22,163,74,0.16)"
+          : "0 4px 14px rgba(15,23,42,0.04)",
+        transform: hovered ? "translateY(-3px)" : "translateY(0)",
       }}
     >
       <div
         style={{
-          width: "100%",
-          aspectRatio: "1",
+          ...styles.productImageBox,
           background: `hsl(${hue},50%,94%)`,
-          borderRadius: 6,
-          marginBottom: compact ? 6 : 8,
-          position: "relative",
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
         }}
       >
         <img
           src={imageUrl}
           alt={product.name}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            borderRadius: 6,
-          }}
+          style={styles.productImage}
           onError={(e) => {
-            e.target.src = "/no-image.png";
+            e.currentTarget.src = "/no-image.png";
           }}
         />
 
         {!compact && discount > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: 5,
-              left: 5,
-              background: COLORS.primary,
-              color: "#fff",
-              fontSize: 9,
-              fontWeight: 700,
-              padding: "2px 5px",
-              borderRadius: 3,
-            }}
-          >
-            -{discount}%
-          </span>
+          <span style={styles.discountBadge}>-{discount}%</span>
         )}
       </div>
 
       <div
         style={{
-          fontSize: compact ? 10 : 11,
-          color: compact ? COLORS.textMuted : COLORS.text,
-          marginBottom: 4,
-          overflow: "hidden",
-          whiteSpace: compact ? "nowrap" : "normal",
-          textOverflow: "ellipsis",
-          display: compact ? "block" : "-webkit-box",
-          WebkitLineClamp: compact ? "unset" : 2,
-          WebkitBoxOrient: "vertical",
-          minHeight: compact ? "auto" : 30,
+          ...styles.productName,
+          fontSize: compact ? 12 : 13,
+          minHeight: compact ? "auto" : 34,
         }}
       >
         {product.name}
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          marginBottom: 3,
-          flexWrap: "wrap",
-        }}
-      >
+      <div style={styles.priceRow}>
         <span
           style={{
-            fontSize: compact ? 12 : 13,
-            fontWeight: 700,
-            color: COLORS.primary,
+            ...styles.finalPrice,
+            fontSize: compact ? 13 : 15,
           }}
         >
           ${finalPrice.toFixed(2)}
         </span>
 
         {discount > 0 && (
-          <span
-            style={{
-              fontSize: compact ? 9 : 10,
-              color: COLORS.textMuted,
-              textDecoration: "line-through",
-            }}
-          >
-            ${originalPrice.toFixed(2)}
-          </span>
+          <span style={styles.oldPrice}>${originalPrice.toFixed(2)}</span>
         )}
       </div>
 
       {!compact && (
-        <div style={{ fontSize: 10, color: COLORS.textMuted }}>
+        <div style={styles.productMeta}>
           {reviewCount > 0 && rating ? (
             <>
               ⭐ {rating} · {reviewCount} review
-              {reviewCount > 1 ? "s" : ""} · {Number(sold).toLocaleString()}{" "}
-              sold
+              {reviewCount > 1 ? "s" : ""} · {Number(sold).toLocaleString()} sold
             </>
           ) : (
             <>No reviews yet · {Number(sold).toLocaleString()} sold</>
@@ -449,7 +307,6 @@ function ShopCard({ shop, index, onClick }) {
 
   const rating = formatRating(shop.average_rating);
   const reviewCount = shop.reviews_count || shop.shop_reviews_count || 0;
-
   const verified = shop.verified || shop.is_verified || false;
 
   return (
@@ -458,39 +315,21 @@ function ShopCard({ shop, index, onClick }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: COLORS.white,
-        borderRadius: 8,
-        border: `1px solid ${COLORS.border}`,
-        padding: 14,
-        cursor: "pointer",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 8,
-        boxShadow: hovered ? "0 4px 14px rgba(232,25,44,0.1)" : "none",
+        ...styles.shopCard,
+        boxShadow: hovered ? "0 8px 22px rgba(22,163,74,0.14)" : "none",
       }}
     >
       <div
         style={{
-          width: 52,
-          height: 52,
-          borderRadius: "50%",
+          ...styles.shopLogo,
           background: `hsl(${index * 70 + 180}, 50%, 90%)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
         }}
       >
         {logo ? (
           <img
             src={logo}
             alt={name}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
+            style={styles.shopLogoImg}
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
@@ -500,22 +339,17 @@ function ShopCard({ shop, index, onClick }) {
         )}
       </div>
 
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>
+      <div style={styles.shopText}>
+        <div style={styles.shopName}>
           {name}
-          {verified && (
-            <span style={{ marginLeft: 3, color: COLORS.purple, fontSize: 11 }}>
-              ✓
-            </span>
-          )}
+          {verified && <span style={styles.verified}> ✓</span>}
         </div>
 
-        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+        <div style={styles.shopMeta}>
           {reviewCount > 0 && rating ? (
             <>
               ⭐ {rating} · {reviewCount} review
-              {reviewCount > 1 ? "s" : ""} ·{" "}
-              {Number(itemCount).toLocaleString()} items
+              {reviewCount > 1 ? "s" : ""} · {Number(itemCount).toLocaleString()} items
             </>
           ) : (
             <>No reviews yet · {Number(itemCount).toLocaleString()} items</>
@@ -524,20 +358,12 @@ function ShopCard({ shop, index, onClick }) {
       </div>
 
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           onClick(shop);
         }}
-        style={{
-          background: "#FFF0F1",
-          color: COLORS.primary,
-          border: "none",
-          padding: "5px 14px",
-          borderRadius: 20,
-          fontSize: 11,
-          fontWeight: 700,
-          cursor: "pointer",
-        }}
+        style={styles.visitButton}
       >
         Visit Store
       </button>
@@ -555,95 +381,42 @@ function PartnerShopCard({ shop, index, onClick }) {
     shop.phone ||
     `${shop.products_count || shop.items_count || 0} products available`;
 
-  const bgColors = ["#fffaf0", "#f0f8ff", "#f0fff4", "#fff0f5"];
+  const bgColors = ["#fffbeb", "#f0fdf4", "#ecfdf5", "#f7fee7"];
 
   return (
     <div
       onClick={() => onClick(shop)}
       style={{
+        ...styles.partnerCard,
         background: bgColors[index % bgColors.length],
-        borderRadius: 8,
-        border: `1px solid ${COLORS.border}`,
-        padding: "14px 18px",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
       }}
     >
-      <div
-        style={{
-          width: 46,
-          height: 46,
-          background: COLORS.white,
-          borderRadius: 10,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-          overflow: "hidden",
-          flexShrink: 0,
-        }}
-      >
+      <div style={styles.partnerLogo}>
         <img
           src={logo}
           alt={name}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
+          style={styles.shopLogoImg}
           onError={(e) => {
             e.currentTarget.style.display = "none";
           }}
         />
       </div>
 
-      <div style={{ minWidth: 0 }}>
-        <div
-          style={{
-            fontWeight: 700,
-            fontSize: 14,
-            color: COLORS.text,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {name}
-        </div>
-
-        <div
-          style={{
-            fontSize: 12,
-            color: COLORS.textMuted,
-            marginTop: 2,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {description}
-        </div>
-
-        <div
-          style={{
-            fontSize: 11,
-            color: COLORS.primary,
-            marginTop: 4,
-            fontWeight: 600,
-          }}
-        >
-          Browse →
-        </div>
+      <div style={styles.partnerText}>
+        <div style={styles.partnerName}>{name}</div>
+        <div style={styles.partnerDescription}>{description}</div>
+        <div style={styles.partnerBrowse}>Browse →</div>
       </div>
     </div>
   );
 }
 
+function EmptyBox({ text }) {
+  return <div style={styles.emptyBox}>{text}</div>;
+}
+
 export default function HomePage() {
   const [activeCategory, setActiveCategory] = useState(null);
-
   const [categories, setCategories] = useState([]);
   const [shops, setShops] = useState([]);
 
@@ -680,9 +453,7 @@ export default function HomePage() {
         ? categoryJson
         : categoryJson.data || [];
 
-      const realShops = Array.isArray(shopJson)
-        ? shopJson
-        : shopJson.data || [];
+      const realShops = Array.isArray(shopJson) ? shopJson : shopJson.data || [];
 
       setHomeData({
         flash_sale: homeJson.flash_sale || [],
@@ -701,7 +472,7 @@ export default function HomePage() {
         }))
       );
     } catch (error) {
-      console.error("HOME DATA ERROR:", error);
+      console.error("Home data error:", error);
 
       setHomeData({
         flash_sale: [],
@@ -776,173 +547,72 @@ export default function HomePage() {
     trendingProducts.length > 0;
 
   return (
-    <div style={{ background: "#f5f5f5", minHeight: "100vh" }}>
+    <div style={styles.page}>
       <Navbar />
 
-      <div style={{ maxWidth: 1700, margin: "0 auto", padding: "14px 20px" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "190px 1fr 175px",
-            gap: 12,
-            marginBottom: 24,
-          }}
-        >
-          <div
-            style={{
-              background: COLORS.white,
-              borderRadius: 8,
-              border: `1px solid ${COLORS.border}`,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                padding: "9px 14px",
-                borderBottom: `1px solid ${COLORS.border}`,
-                fontSize: 11,
-                fontWeight: 800,
-                color: COLORS.textMuted,
-                letterSpacing: 0.8,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              ☰ CATEGORY
-            </div>
+      <main style={styles.main}>
+        <section style={styles.topGrid}>
+          <aside style={styles.categoryPanel}>
+            <div style={styles.panelTitle}>☰ CATEGORY</div>
 
             {categories.length === 0 && !loading ? (
-              <div
-                style={{
-                  padding: 14,
-                  fontSize: 12,
-                  color: COLORS.textMuted,
-                }}
-              >
-                No categories found.
-              </div>
+              <div style={styles.panelEmpty}>No categories found.</div>
             ) : (
               categories.map((cat, index) => (
-                <div
+                <button
                   key={cat.id || index}
+                  type="button"
                   onClick={() => {
                     setActiveCategory(index);
                     requireLogin(cat.route);
                   }}
                   style={{
-                    padding: "9px 14px",
-                    fontSize: 12,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    background:
-                      activeCategory === index ? "#FFF0F1" : "transparent",
-                    color:
-                      activeCategory === index ? COLORS.primary : COLORS.text,
-                    fontWeight: activeCategory === index ? 700 : 400,
-                    borderLeft:
-                      activeCategory === index
-                        ? `3px solid ${COLORS.primary}`
-                        : "3px solid transparent",
-                    transition: "all 0.15s",
+                    ...styles.categoryItem,
+                    ...(activeCategory === index ? styles.activeCategoryItem : {}),
                   }}
                 >
-                  <span style={{ fontSize: 14 }}>{cat.icon}</span>
-                  {cat.label}
-                </div>
+                  <span style={styles.categoryIcon}>{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
               ))
             )}
-          </div>
+          </aside>
 
           <HeroBanner onAction={goToProductList} />
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div
-              style={{
-                background: COLORS.white,
-                borderRadius: 8,
-                border: `1px solid ${COLORS.border}`,
-                padding: 10,
-                flex: 1,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 800,
-                  color: COLORS.textMuted,
-                  marginBottom: 8,
-                  letterSpacing: 0.8,
-                }}
-              >
-                POPULAR BRANDS
-              </div>
+          <aside style={styles.sidePanel}>
+            <div style={styles.brandBox}>
+              <div style={styles.panelTitle}>POPULAR BRANDS</div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: 4,
-                }}
-              >
+              <div style={styles.brandGrid}>
                 {BRANDS.map((brand, index) => (
-                  <div
+                  <button
                     key={index}
-                    onClick={() =>
-                      requireLogin(`/brand/${brand.name.toLowerCase()}`)
-                    }
+                    type="button"
+                    onClick={() => requireLogin(`/brand/${brand.name.toLowerCase()}`)}
                     style={{
+                      ...styles.brandItem,
                       background: brand.bg,
-                      borderRadius: 5,
-                      padding: "5px 2px",
-                      textAlign: "center",
-                      cursor: "pointer",
                     }}
                   >
-                    <div
-                      style={{
-                        color: "#fff",
-                        fontSize: 9,
-                        fontWeight: 800,
-                      }}
-                    >
-                      {brand.name}
-                    </div>
-                  </div>
+                    {brand.name}
+                  </button>
                 ))}
               </div>
             </div>
 
-            <div
+            <button
+              type="button"
               onClick={() => requireLogin("/flash-sale")}
-              style={{
-                background: "linear-gradient(135deg, #E8192C, #FF6B35)",
-                borderRadius: 8,
-                padding: 12,
-                cursor: "pointer",
-              }}
+              style={styles.flashMini}
             >
-              <div
-                style={{
-                  color: "#fff",
-                  fontSize: 11,
-                  fontWeight: 800,
-                  marginBottom: 2,
-                }}
-              >
-                🔥 FLASH SALE
-              </div>
+              <strong>🔥 FLASH SALE</strong>
+              <span>Discount products</span>
+            </button>
+          </aside>
+        </section>
 
-              <div style={{ color: "rgba(255,255,255,0.82)", fontSize: 10 }}>
-                Discount products
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 28 }}>
+        <section style={styles.section}>
           <SectionTitle title="Featured Stores" />
 
           {loading ? (
@@ -950,13 +620,7 @@ export default function HomePage() {
           ) : shops.length === 0 ? (
             <EmptyBox text="No shops found." />
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 12,
-              }}
-            >
+            <div style={styles.shopGrid}>
               {shops.slice(0, 4).map((shop, index) => (
                 <ShopCard
                   key={shop.id || index}
@@ -967,19 +631,13 @@ export default function HomePage() {
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         {!loading && shops.length > 4 && (
-          <div style={{ marginBottom: 28 }}>
+          <section style={styles.section}>
             <SectionTitle title="More Shops" />
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: 12,
-              }}
-            >
+            <div style={styles.partnerGrid}>
               {shops.slice(4, 7).map((shop, index) => (
                 <PartnerShopCard
                   key={shop.id || index}
@@ -989,64 +647,26 @@ export default function HomePage() {
                 />
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        <div
-          style={{
-            background: "linear-gradient(135deg, #E8192C 0%, #FF6B35 100%)",
-            borderRadius: 10,
-            padding: "20px 28px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 28,
-          }}
-        >
+        <section style={styles.flashBanner}>
           <div>
-            <div
-              style={{
-                color: "rgba(255,255,255,0.8)",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: 1,
-              }}
-            >
-              LIMITED OFFER
-            </div>
-
-            <div
-              style={{
-                color: "#fff",
-                fontSize: 22,
-                fontWeight: 900,
-                margin: "4px 0",
-              }}
-            >
-              Flash Sale — Discount Products
-            </div>
-
-            <div style={{ color: "rgba(255,255,255,0.78)", fontSize: 13 }}>
+            <div style={styles.bannerLabel}>LIMITED OFFER</div>
+            <div style={styles.bannerTitle}>Flash Sale — Discount Products</div>
+            <div style={styles.bannerText}>
               Products with discount set by shop owners
             </div>
           </div>
 
           <button
+            type="button"
             onClick={() => requireLogin("/flash-sale")}
-            style={{
-              background: "#fff",
-              color: COLORS.primary,
-              border: "none",
-              padding: "10px 24px",
-              borderRadius: 24,
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: "pointer",
-            }}
+            style={styles.bannerButton}
           >
             Shop Flash Sale
           </button>
-        </div>
+        </section>
 
         {loading ? (
           <EmptyBox text="Loading products..." />
@@ -1054,7 +674,7 @@ export default function HomePage() {
           <EmptyBox text="No products found." />
         ) : (
           <>
-            <div style={{ marginBottom: 28 }}>
+            <section style={styles.section}>
               <SectionTitle
                 title="Flash Sale"
                 onLink={() => requireLogin("/flash-sale")}
@@ -1063,13 +683,7 @@ export default function HomePage() {
               {flashSaleProducts.length === 0 ? (
                 <EmptyBox text="No flash sale products yet." />
               ) : (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(8, 1fr)",
-                    gap: 10,
-                  }}
-                >
+                <div style={styles.compactProductGrid}>
                   {flashSaleProducts.slice(0, 8).map((product) => (
                     <ProductCard
                       key={product.id}
@@ -1080,9 +694,9 @@ export default function HomePage() {
                   ))}
                 </div>
               )}
-            </div>
+            </section>
 
-            <div style={{ marginBottom: 28 }}>
+            <section style={styles.section}>
               <SectionTitle
                 title="Best Deal"
                 onLink={() => requireLogin("/best-deal")}
@@ -1091,13 +705,7 @@ export default function HomePage() {
               {bestDealProducts.length === 0 ? (
                 <EmptyBox text="No newest products yet." />
               ) : (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(5, 1fr)",
-                    gap: 14,
-                  }}
-                >
+                <div style={styles.productGrid}>
                   {bestDealProducts.slice(0, 10).map((product) => (
                     <ProductCard
                       key={product.id}
@@ -1107,9 +715,9 @@ export default function HomePage() {
                   ))}
                 </div>
               )}
-            </div>
+            </section>
 
-            <div style={{ marginBottom: 28 }}>
+            <section style={styles.section}>
               <SectionTitle
                 title="Trending Now"
                 onLink={() => requireLogin("/trending")}
@@ -1118,13 +726,7 @@ export default function HomePage() {
               {trendingProducts.length === 0 ? (
                 <EmptyBox text="No trending products yet." />
               ) : (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(5, 1fr)",
-                    gap: 14,
-                  }}
-                >
+                <div style={styles.productGrid}>
                   {trendingProducts.slice(0, 10).map((product) => (
                     <ProductCard
                       key={product.id}
@@ -1134,50 +736,19 @@ export default function HomePage() {
                   ))}
                 </div>
               )}
-            </div>
+            </section>
           </>
         )}
 
-        <div
-          style={{
-            background: "linear-gradient(135deg, #1428A0 0%, #185FA5 100%)",
-            borderRadius: 10,
-            padding: "20px 28px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 28,
-          }}
-        >
+        <section style={styles.newArrivalBanner}>
           <div>
-            <div
-              style={{
-                color: "rgba(255,255,255,0.65)",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: 1.2,
-              }}
-            >
-              NEW ARRIVAL
-            </div>
-
-            <div
-              style={{
-                color: "#fff",
-                fontSize: 20,
-                fontWeight: 900,
-                margin: "4px 0",
-              }}
-            >
-              Discover New Products
-            </div>
-
-            <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 13 }}>
-              Newest products appear in Best Deal
-            </div>
+            <div style={styles.bannerLabel}>NEW ARRIVAL</div>
+            <div style={styles.bannerTitle}>Discover New Products</div>
+            <div style={styles.bannerText}>Newest products appear in Best Deal</div>
           </div>
 
           <button
+            type="button"
             onClick={() => {
               if (bestDealProducts.length > 0) {
                 requireLogin(`/products/${bestDealProducts[0].id}`);
@@ -1185,39 +756,447 @@ export default function HomePage() {
                 requireLogin(firstCategoryRoute);
               }
             }}
-            style={{
-              background: "#F6AD55",
-              color: "#fff",
-              border: "none",
-              padding: "10px 24px",
-              borderRadius: 24,
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: "pointer",
-            }}
+            style={styles.bannerButton}
           >
             Grab Deal
           </button>
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }
 
-function EmptyBox({ text }) {
-  return (
-    <div
-      style={{
-        background: "#fff",
-        padding: 24,
-        borderRadius: 8,
-        color: COLORS.textMuted,
-        textAlign: "center",
-        border: `1px solid ${COLORS.border}`,
-        marginBottom: 12,
-      }}
-    >
-      {text}
-    </div>
-  );
-}
+const styles = {
+  page: {
+    background: COLORS.bg,
+    minHeight: "100vh",
+  },
+  main: {
+    width: "100%",
+    maxWidth: 1700,
+    margin: "0 auto",
+    padding: "clamp(14px, 2vw, 24px)",
+    boxSizing: "border-box",
+  },
+  topGrid: {
+    display: "grid",
+    gridTemplateColumns: "minmax(170px, 210px) minmax(0, 1fr) minmax(160px, 190px)",
+    gap: 14,
+    marginBottom: 28,
+  },
+  categoryPanel: {
+    background: COLORS.white,
+    borderRadius: 12,
+    border: `1px solid ${COLORS.border}`,
+    overflow: "hidden",
+  },
+  panelTitle: {
+    padding: "10px 14px",
+    borderBottom: `1px solid ${COLORS.border}`,
+    fontSize: 11,
+    fontWeight: 900,
+    color: COLORS.textMuted,
+    letterSpacing: 0.8,
+  },
+  panelEmpty: {
+    padding: 14,
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  categoryItem: {
+    width: "100%",
+    padding: "10px 14px",
+    fontSize: 13,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    background: "transparent",
+    color: COLORS.text,
+    border: "none",
+    borderLeft: "3px solid transparent",
+    textAlign: "left",
+    transition: "all 0.15s",
+  },
+  activeCategoryItem: {
+    background: COLORS.primaryLight,
+    color: COLORS.primaryDark,
+    borderLeft: `3px solid ${COLORS.primary}`,
+    fontWeight: 800,
+  },
+  categoryIcon: {
+    fontSize: 15,
+  },
+  hero: {
+    borderRadius: 14,
+    overflow: "hidden",
+    position: "relative",
+    minHeight: 230,
+    display: "flex",
+    alignItems: "center",
+    padding: "clamp(24px, 4vw, 42px)",
+    boxSizing: "border-box",
+    transition: "background 0.6s",
+  },
+  heroContent: {
+    zIndex: 1,
+    flex: 1,
+    maxWidth: 540,
+  },
+  heroBadge: {
+    display: "inline-block",
+    fontSize: 11,
+    fontWeight: 900,
+    letterSpacing: 1.5,
+    padding: "5px 12px",
+    borderRadius: 999,
+    marginBottom: 10,
+  },
+  heroTitle: {
+    color: COLORS.white,
+    fontSize: "clamp(28px, 4vw, 42px)",
+    fontWeight: 900,
+    margin: "0 0 8px",
+  },
+  heroSubtitle: {
+    color: "rgba(255,255,255,0.84)",
+    fontSize: 15,
+    margin: "0 0 18px",
+  },
+  heroButton: {
+    border: "none",
+    padding: "11px 24px",
+    borderRadius: 999,
+    fontSize: 14,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  heroIcon: {
+    position: "absolute",
+    right: 28,
+    bottom: -8,
+    fontSize: 110,
+    opacity: 0.12,
+  },
+  heroDots: {
+    position: "absolute",
+    bottom: 14,
+    left: "50%",
+    transform: "translateX(-50%)",
+    display: "flex",
+    gap: 6,
+  },
+  heroDot: {
+    height: 7,
+    borderRadius: 999,
+    border: "none",
+    cursor: "pointer",
+    transition: "all 0.3s",
+  },
+  sidePanel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
+  brandBox: {
+    background: COLORS.white,
+    borderRadius: 12,
+    border: `1px solid ${COLORS.border}`,
+    paddingBottom: 10,
+    flex: 1,
+  },
+  brandGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 6,
+    padding: 10,
+  },
+  brandItem: {
+    borderRadius: 7,
+    padding: "7px 2px",
+    textAlign: "center",
+    cursor: "pointer",
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: 900,
+    border: "none",
+  },
+  flashMini: {
+    background: "linear-gradient(135deg,#16a34a,#22c55e)",
+    borderRadius: 12,
+    padding: 14,
+    cursor: "pointer",
+    color: COLORS.white,
+    border: "none",
+    textAlign: "left",
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+  },
+  section: {
+    marginBottom: 30,
+  },
+  sectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 900,
+    color: COLORS.text,
+    margin: 0,
+  },
+  sectionLink: {
+    fontSize: 13,
+    color: COLORS.primaryDark,
+    cursor: "pointer",
+    fontWeight: 900,
+    border: "none",
+    background: "transparent",
+  },
+  shopGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+    gap: 14,
+  },
+  partnerGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+    gap: 14,
+  },
+  shopCard: {
+    background: COLORS.white,
+    borderRadius: 14,
+    border: `1px solid ${COLORS.border}`,
+    padding: 16,
+    cursor: "pointer",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 10,
+    transition: "all 0.2s",
+  },
+  shopLogo: {
+    width: 58,
+    height: 58,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  shopLogoImg: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  shopText: {
+    textAlign: "center",
+  },
+  shopName: {
+    fontSize: 14,
+    fontWeight: 900,
+    color: COLORS.text,
+  },
+  verified: {
+    color: COLORS.primary,
+    fontSize: 12,
+  },
+  shopMeta: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 3,
+  },
+  visitButton: {
+    background: COLORS.primaryLight,
+    color: COLORS.primaryDark,
+    border: "none",
+    padding: "7px 16px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  partnerCard: {
+    borderRadius: 14,
+    border: `1px solid ${COLORS.border}`,
+    padding: "16px 18px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+  },
+  partnerLogo: {
+    width: 52,
+    height: 52,
+    background: COLORS.white,
+    borderRadius: 14,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+    overflow: "hidden",
+    flexShrink: 0,
+  },
+  partnerText: {
+    minWidth: 0,
+  },
+  partnerName: {
+    fontWeight: 900,
+    fontSize: 15,
+    color: COLORS.text,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  partnerDescription: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginTop: 3,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  partnerBrowse: {
+    fontSize: 12,
+    color: COLORS.primaryDark,
+    marginTop: 5,
+    fontWeight: 900,
+  },
+  flashBanner: {
+    background: "linear-gradient(135deg,#15803d,#22c55e)",
+    borderRadius: 16,
+    padding: "clamp(18px, 3vw, 28px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 18,
+    marginBottom: 30,
+    flexWrap: "wrap",
+  },
+  newArrivalBanner: {
+    background: "linear-gradient(135deg,#166534,#0f766e)",
+    borderRadius: 16,
+    padding: "clamp(18px, 3vw, 28px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 18,
+    marginBottom: 30,
+    flexWrap: "wrap",
+  },
+  bannerLabel: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+    fontWeight: 900,
+    letterSpacing: 1.2,
+  },
+  bannerTitle: {
+    color: COLORS.white,
+    fontSize: "clamp(21px, 3vw, 28px)",
+    fontWeight: 900,
+    margin: "5px 0",
+  },
+  bannerText: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 14,
+  },
+  bannerButton: {
+    background: COLORS.white,
+    color: COLORS.primaryDark,
+    border: "none",
+    padding: "11px 24px",
+    borderRadius: 999,
+    fontSize: 14,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  compactProductGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 145px), 1fr))",
+    gap: 12,
+  },
+  productGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 210px), 1fr))",
+    gap: 16,
+  },
+  productCard: {
+    background: COLORS.white,
+    borderRadius: 14,
+    border: `1px solid ${COLORS.border}`,
+    cursor: "pointer",
+    transition: "all 0.2s",
+    minWidth: 0,
+  },
+  productImageBox: {
+    width: "100%",
+    aspectRatio: "1",
+    borderRadius: 10,
+    marginBottom: 10,
+    position: "relative",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  productImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    borderRadius: 10,
+  },
+  discountBadge: {
+    position: "absolute",
+    top: 7,
+    left: 7,
+    background: COLORS.primary,
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: 900,
+    padding: "3px 7px",
+    borderRadius: 999,
+  },
+  productName: {
+    color: COLORS.text,
+    marginBottom: 6,
+    overflow: "hidden",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+  },
+  priceRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+    flexWrap: "wrap",
+  },
+  finalPrice: {
+    fontWeight: 900,
+    color: COLORS.primaryDark,
+  },
+  oldPrice: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    textDecoration: "line-through",
+  },
+  productMeta: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
+  emptyBox: {
+    background: COLORS.white,
+    padding: 24,
+    borderRadius: 14,
+    color: COLORS.textMuted,
+    textAlign: "center",
+    border: `1px solid ${COLORS.border}`,
+    marginBottom: 12,
+    fontWeight: 700,
+  },
+};

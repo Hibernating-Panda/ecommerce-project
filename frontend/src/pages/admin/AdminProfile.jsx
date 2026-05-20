@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { roleThemes } from "../../theme/roleThemes";
 
 export default function AdminProfile() {
+  const theme = roleThemes.admin;
   const { updateAuthUser } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -19,6 +21,10 @@ export default function AdminProfile() {
     profile_image: "",
     password: "",
   });
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
 
   const fetchProfile = async () => {
     try {
@@ -43,16 +49,10 @@ export default function AdminProfile() {
     }
   };
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
   const handleChange = (e) => {
-    const { name, value } = e.target;
-
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [e.target.name]: e.target.value,
     }));
   };
 
@@ -114,6 +114,7 @@ export default function AdminProfile() {
     <div style={styles.page}>
       <div style={styles.header}>
         <div>
+          <p style={{ ...styles.kicker, color: theme.primary }}>Admin</p>
           <h1 style={styles.title}>Admin Profile</h1>
           <p style={styles.subtitle}>
             Update your personal information and profile image.
@@ -126,7 +127,7 @@ export default function AdminProfile() {
 
       <div style={styles.profileGrid}>
         <div style={styles.previewCard}>
-          <div style={styles.profileImageBox}>
+          <div style={{ ...styles.profileImageBox, borderColor: theme.primaryLight }}>
             {formData.profile_image ? (
               <img
                 src={formData.profile_image}
@@ -137,14 +138,22 @@ export default function AdminProfile() {
                 }}
               />
             ) : (
-              <div style={styles.profileInitial}>
+              <div
+                style={{
+                  ...styles.profileInitial,
+                  backgroundColor: theme.primaryLight,
+                  color: theme.primaryDark,
+                }}
+              >
                 {formData.name ? formData.name.charAt(0).toUpperCase() : "A"}
               </div>
             )}
           </div>
 
           <h2 style={styles.previewName}>{formData.name || "Admin"}</h2>
-          <p style={styles.previewRole}>Administrator</p>
+          <p style={{ ...styles.previewRole, color: theme.primary }}>
+            Administrator
+          </p>
 
           <div style={styles.previewInfo}>
             <p>
@@ -161,53 +170,39 @@ export default function AdminProfile() {
 
           <form onSubmit={updateProfile}>
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  style={styles.input}
-                  required
-                />
-              </div>
+              <InputGroup
+                label="Name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+              />
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  style={styles.input}
-                  required
-                />
-              </div>
+              <InputGroup
+                label="Email"
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+              />
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Phone</label>
-                <input
-                  type="text"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  style={styles.input}
-                  placeholder="Example: 012345678"
-                />
-              </div>
+              <InputGroup
+                label="Phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Example: 012345678"
+              />
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>New Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  style={styles.input}
-                  placeholder="Leave blank to keep current password"
-                />
-              </div>
+              <InputGroup
+                label="New Password"
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Leave blank to keep current password"
+              />
 
               <div style={{ ...styles.formGroup, gridColumn: "1 / -1" }}>
                 <label style={styles.label}>Profile Image URL</label>
@@ -219,9 +214,7 @@ export default function AdminProfile() {
                   style={styles.input}
                   placeholder="https://example.com/profile.jpg"
                 />
-                <p style={styles.hint}>
-                  Use an image URL for now.
-                </p>
+                <p style={styles.hint}>Use an image URL for now.</p>
               </div>
 
               <div style={{ ...styles.formGroup, gridColumn: "1 / -1" }}>
@@ -237,7 +230,11 @@ export default function AdminProfile() {
               </div>
             </div>
 
-            <button type="submit" disabled={saving} style={styles.saveButton}>
+            <button
+              type="submit"
+              disabled={saving}
+              style={{ ...styles.saveButton, backgroundColor: theme.primary }}
+            >
               {saving ? "Saving..." : "Save Changes"}
             </button>
           </form>
@@ -247,22 +244,38 @@ export default function AdminProfile() {
   );
 }
 
+function InputGroup({ label, ...props }) {
+  return (
+    <div style={styles.formGroup}>
+      <label style={styles.label}>{label}</label>
+      <input {...props} style={styles.input} />
+    </div>
+  );
+}
+
 const styles = {
   page: {
-    padding: "24px",
-    backgroundColor: "#f5f7fb",
+    padding: "clamp(16px, 2.5vw, 28px)",
     minHeight: "100vh",
+    boxSizing: "border-box",
   },
   header: {
     marginBottom: "20px",
   },
+  kicker: {
+    margin: "0 0 6px",
+    fontSize: "13px",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+  },
   title: {
     margin: 0,
-    fontSize: "30px",
+    fontSize: "clamp(28px, 4vw, 38px)",
     color: "#111827",
   },
   subtitle: {
-    margin: "8px 0 0 0",
+    margin: "8px 0 0",
     color: "#6b7280",
   },
   successBox: {
@@ -283,7 +296,7 @@ const styles = {
   },
   profileGrid: {
     display: "grid",
-    gridTemplateColumns: "320px 1fr",
+    gridTemplateColumns: "minmax(240px, 320px) minmax(0, 1fr)",
     gap: "22px",
     alignItems: "start",
   },
@@ -291,7 +304,7 @@ const styles = {
     backgroundColor: "#ffffff",
     borderRadius: "18px",
     padding: "24px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
     border: "1px solid #eef1f6",
     textAlign: "center",
   },
@@ -301,11 +314,11 @@ const styles = {
     borderRadius: "50%",
     overflow: "hidden",
     backgroundColor: "#f3f4f6",
-    margin: "0 auto 18px auto",
+    margin: "0 auto 18px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    border: "4px solid #eef2ff",
+    border: "4px solid #fee2e2",
   },
   profileImage: {
     width: "100%",
@@ -315,8 +328,6 @@ const styles = {
   profileInitial: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#f59e0b",
-    color: "#111827",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -324,26 +335,27 @@ const styles = {
     fontWeight: "900",
   },
   previewName: {
-    margin: "0 0 6px 0",
+    margin: "0 0 6px",
     color: "#111827",
   },
   previewRole: {
     margin: 0,
-    color: "#6b7280",
-    fontWeight: "700",
+    fontWeight: "800",
   },
   previewInfo: {
     marginTop: "20px",
     textAlign: "left",
     color: "#374151",
     lineHeight: "1.7",
+    overflowWrap: "anywhere",
   },
   formCard: {
     backgroundColor: "#ffffff",
     borderRadius: "18px",
     padding: "24px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
     border: "1px solid #eef1f6",
+    minWidth: 0,
   },
   formTitle: {
     marginTop: 0,
@@ -352,7 +364,7 @@ const styles = {
   },
   formGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(220px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: "16px",
     marginBottom: "18px",
   },
@@ -363,7 +375,7 @@ const styles = {
   },
   label: {
     fontSize: "14px",
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#374151",
   },
   input: {
@@ -372,6 +384,8 @@ const styles = {
     border: "1px solid #d1d5db",
     outline: "none",
     fontSize: "14px",
+    width: "100%",
+    boxSizing: "border-box",
   },
   textarea: {
     padding: "11px 12px",
@@ -381,6 +395,8 @@ const styles = {
     fontSize: "14px",
     resize: "vertical",
     fontFamily: "inherit",
+    width: "100%",
+    boxSizing: "border-box",
   },
   hint: {
     margin: 0,
@@ -391,7 +407,6 @@ const styles = {
     padding: "11px 18px",
     borderRadius: "10px",
     border: "none",
-    backgroundColor: "#4f46e5",
     color: "#ffffff",
     cursor: "pointer",
     fontWeight: "800",
@@ -400,6 +415,6 @@ const styles = {
     backgroundColor: "#ffffff",
     borderRadius: "18px",
     padding: "24px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
   },
 };

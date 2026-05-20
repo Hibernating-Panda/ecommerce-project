@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Models\Product;
 use App\Models\Wishlist;
 use Illuminate\Http\Request;
 
@@ -10,7 +10,10 @@ class WishlistController extends Controller
 {
     public function index(Request $request)
     {
-        $wishlist = Wishlist::with('product.shop')
+        $wishlist = Wishlist::with([
+                'product.shop',
+                'product.category',
+            ])
             ->where('user_id', $request->user()->id)
             ->latest()
             ->get();
@@ -22,7 +25,9 @@ class WishlistController extends Controller
 
     public function toggle(Request $request)
     {
-        if (!$request->user()->hasRole('user')) {
+        $user = $request->user();
+
+        if (! $user->hasRole('user')) {
             return response()->json([
                 'message' => 'Only customers can use wishlist.',
             ], 403);
@@ -32,7 +37,17 @@ class WishlistController extends Controller
             'product_id' => ['required', 'exists:products,id'],
         ]);
 
-        $wishlist = Wishlist::where('user_id', $request->user()->id)
+        $product = Product::where('id', $validated['product_id'])
+            ->where('status', 'active')
+            ->first();
+
+        if (! $product) {
+            return response()->json([
+                'message' => 'Product is not available.',
+            ], 422);
+        }
+
+        $wishlist = Wishlist::where('user_id', $user->id)
             ->where('product_id', $validated['product_id'])
             ->first();
 
@@ -46,7 +61,7 @@ class WishlistController extends Controller
         }
 
         Wishlist::create([
-            'user_id' => $request->user()->id,
+            'user_id' => $user->id,
             'product_id' => $validated['product_id'],
         ]);
 

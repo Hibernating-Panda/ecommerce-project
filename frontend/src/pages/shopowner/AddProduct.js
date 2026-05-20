@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 import PopupMessage from "../../components/common/PopupMessage";
+import { roleThemes } from "../../theme/roleThemes";
 
 function AddProduct() {
+  const theme = roleThemes.shop_owner;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get("id");
@@ -26,48 +28,14 @@ function AddProduct() {
     category_id: "",
     image: "",
     description: "",
-    status: "Active",
+    status: "active",
     sizes: [],
+    discount_percent: "",
+    discount_start: "",
+    discount_end: "",
   });
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await api.get("/shopowner/categories");
-        setCategories(res.data);
-      } catch (error) {
-        console.error("Fetch categories error:", error);
-        showPopup("error", "Category Error", "Failed to load categories.");
-      }
-    };
-
-    const fetchProduct = async () => {
-      try {
-        const res = await api.get(`/shopowner/products/${editId}`);
-
-        setProduct({
-          name: res.data.name || "",
-          price: res.data.price || "",
-          stock: res.data.stock || "",
-          category_id: res.data.category_id || "",
-          image: res.data.image || "",
-          description: res.data.description || "",
-          status: res.data.status || "Active",
-          sizes: res.data.sizes || [],
-          discount_percent: res.data.discount_percent || "",
-          discount_start: res.data.discount_start
-            ? res.data.discount_start.slice(0, 16)
-            : "",
-          discount_end: res.data.discount_end
-            ? res.data.discount_end.slice(0, 16)
-            : "",
-        });
-      } catch (error) {
-        console.error("Fetch product error:", error);
-        showPopup("error", "Product Error", "Failed to load product.");
-      }
-    };
-
     fetchCategories();
 
     if (editId) {
@@ -75,14 +43,45 @@ function AddProduct() {
     }
   }, [editId]);
 
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get("/shopowner/categories");
+      setCategories(Array.isArray(res.data) ? res.data : res.data.data || []);
+    } catch (error) {
+      console.error("Fetch categories error:", error);
+      showPopup("error", "Category Error", "Failed to load categories.");
+    }
+  };
+
+  const fetchProduct = async () => {
+    try {
+      const res = await api.get(`/shopowner/products/${editId}`);
+
+      setProduct({
+        name: res.data.name || "",
+        price: res.data.price || "",
+        stock: res.data.stock || "",
+        category_id: res.data.category_id || "",
+        image: res.data.image || "",
+        description: res.data.description || "",
+        status: res.data.status || "active",
+        sizes: res.data.sizes || [],
+        discount_percent: res.data.discount_percent || "",
+        discount_start: res.data.discount_start
+          ? res.data.discount_start.slice(0, 16)
+          : "",
+        discount_end: res.data.discount_end
+          ? res.data.discount_end.slice(0, 16)
+          : "",
+      });
+    } catch (error) {
+      console.error("Fetch product error:", error);
+      showPopup("error", "Product Error", "Failed to load product.");
+    }
+  };
+
   const showPopup = (type, title, message, redirect = false) => {
-    setPopup({
-      show: true,
-      type,
-      title,
-      message,
-      redirect,
-    });
+    setPopup({ show: true, type, title, message, redirect });
   };
 
   const closePopup = () => {
@@ -97,7 +96,7 @@ function AddProduct() {
     });
 
     if (shouldRedirect) {
-      navigate("/shop/products");
+      navigate("/shopowner/products");
     }
   };
 
@@ -111,14 +110,7 @@ function AddProduct() {
   const addSize = () => {
     setProduct({
       ...product,
-      sizes: [
-        ...product.sizes,
-        {
-          size: "",
-          price: "",
-          stock: "",
-        },
-      ],
+      sizes: [...product.sizes, { size: "", price: "", stock: "" }],
     });
   };
 
@@ -133,11 +125,9 @@ function AddProduct() {
   };
 
   const removeSize = (index) => {
-    const updatedSizes = product.sizes.filter((_, i) => i !== index);
-
     setProduct({
       ...product,
-      sizes: updatedSizes,
+      sizes: product.sizes.filter((_, i) => i !== index),
     });
   };
 
@@ -151,8 +141,8 @@ function AddProduct() {
         price: Number(product.price),
         stock: Number(product.stock),
         category_id: product.category_id ? Number(product.category_id) : null,
-        image: product.image,
-        description: product.description,
+        image: product.image || null,
+        description: product.description || null,
         status: product.status,
         discount_percent: product.discount_percent
           ? Number(product.discount_percent)
@@ -189,10 +179,7 @@ function AddProduct() {
       console.error("Save product error:", error);
 
       if (error.response?.data?.errors) {
-        const errors = Object.values(error.response.data.errors)
-          .flat()
-          .join("\n");
-
+        const errors = Object.values(error.response.data.errors).flat().join("\n");
         showPopup("error", "Validation Error", errors);
       } else {
         showPopup("error", "Save Failed", "Failed to save product.");
@@ -203,7 +190,7 @@ function AddProduct() {
   };
 
   return (
-    <div>
+    <div style={styles.page}>
       <PopupMessage
         show={popup.show}
         type={popup.type}
@@ -212,52 +199,47 @@ function AddProduct() {
         onClose={closePopup}
       />
 
-      <h1 style={styles.title}>{editId ? "Edit Product" : "Add Product"}</h1>
-      <p style={styles.desc}>
-        {editId
-          ? "Update product information."
-          : "Create a new product for your shop."}
-      </p>
+      <div style={styles.header}>
+        <p style={{ ...styles.kicker, color: theme.primary }}>
+          Shop Owner
+        </p>
+        <h1 style={styles.title}>{editId ? "Edit Product" : "Add Product"}</h1>
+        <p style={styles.desc}>
+          {editId
+            ? "Update product information."
+            : "Create a new product for your shop."}
+        </p>
+      </div>
 
       <form style={styles.form} onSubmit={handleSubmit}>
         <div style={styles.grid}>
-          <div>
-            <label style={styles.label}>Product Name</label>
-            <input
-              type="text"
-              name="name"
-              value={product.name}
-              onChange={handleChange}
-              style={styles.input}
-              required
-            />
-          </div>
+          <InputGroup
+            label="Product Name"
+            name="name"
+            value={product.name}
+            onChange={handleChange}
+            required
+          />
 
-          <div>
-            <label style={styles.label}>Base Price</label>
-            <input
-              type="number"
-              name="price"
-              value={product.price}
-              onChange={handleChange}
-              style={styles.input}
-              min="0"
-              required
-            />
-          </div>
+          <InputGroup
+            label="Base Price"
+            name="price"
+            type="number"
+            value={product.price}
+            onChange={handleChange}
+            min="0"
+            required
+          />
 
-          <div>
-            <label style={styles.label}>Base Stock</label>
-            <input
-              type="number"
-              name="stock"
-              value={product.stock}
-              onChange={handleChange}
-              style={styles.input}
-              min="0"
-              required
-            />
-          </div>
+          <InputGroup
+            label="Base Stock"
+            name="stock"
+            type="number"
+            value={product.stock}
+            onChange={handleChange}
+            min="0"
+            required
+          />
 
           <div>
             <label style={styles.label}>Category</label>
@@ -268,7 +250,6 @@ function AddProduct() {
               style={styles.input}
             >
               <option value="">Select Category</option>
-
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -278,17 +259,13 @@ function AddProduct() {
           </div>
         </div>
 
-        <div>
-          <label style={styles.label}>Image URL</label>
-          <input
-            type="text"
-            name="image"
-            value={product.image}
-            onChange={handleChange}
-            style={styles.input}
-            placeholder="https://example.com/image.jpg"
-          />
-        </div>
+        <InputGroup
+          label="Image URL"
+          name="image"
+          value={product.image}
+          onChange={handleChange}
+          placeholder="https://example.com/image.jpg"
+        />
 
         <div>
           <label style={styles.label}>Status</label>
@@ -298,12 +275,12 @@ function AddProduct() {
             onChange={handleChange}
             style={styles.input}
           >
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
 
-        <div style={styles.sizeSection}>
+        <div style={{ ...styles.sizeSection, borderColor: theme.border }}>
           <div style={styles.sizeHeader}>
             <div>
               <h2 style={styles.sizeTitle}>Product Sizes</h2>
@@ -312,7 +289,11 @@ function AddProduct() {
               </p>
             </div>
 
-            <button type="button" onClick={addSize} style={styles.addSizeBtn}>
+            <button
+              type="button"
+              onClick={addSize}
+              style={{ ...styles.addSizeBtn, backgroundColor: theme.primary }}
+            >
               + Add Size
             </button>
           </div>
@@ -323,40 +304,28 @@ function AddProduct() {
 
           {product.sizes.map((item, index) => (
             <div key={index} style={styles.sizeRow}>
-              <div>
-                <label style={styles.smallLabel}>Size</label>
-                <input
-                  type="text"
-                  value={item.size}
-                  onChange={(e) => updateSize(index, "size", e.target.value)}
-                  style={styles.sizeInput}
-                  placeholder="M, L, XL"
-                />
-              </div>
+              <SizeInput
+                label="Size"
+                value={item.size}
+                onChange={(value) => updateSize(index, "size", value)}
+                placeholder="M, L, XL"
+              />
 
-              <div>
-                <label style={styles.smallLabel}>Price</label>
-                <input
-                  type="number"
-                  value={item.price}
-                  onChange={(e) => updateSize(index, "price", e.target.value)}
-                  style={styles.sizeInput}
-                  placeholder="20"
-                  min="0"
-                />
-              </div>
+              <SizeInput
+                label="Price"
+                type="number"
+                value={item.price}
+                onChange={(value) => updateSize(index, "price", value)}
+                placeholder="20"
+              />
 
-              <div>
-                <label style={styles.smallLabel}>Stock</label>
-                <input
-                  type="number"
-                  value={item.stock}
-                  onChange={(e) => updateSize(index, "stock", e.target.value)}
-                  style={styles.sizeInput}
-                  placeholder="10"
-                  min="0"
-                />
-              </div>
+              <SizeInput
+                label="Stock"
+                type="number"
+                value={item.stock}
+                onChange={(value) => updateSize(index, "stock", value)}
+                placeholder="10"
+              />
 
               <button
                 type="button"
@@ -376,41 +345,32 @@ function AddProduct() {
           </p>
 
           <div style={styles.grid}>
-            <div>
-              <label style={styles.label}>Discount Percent</label>
-              <input
-                type="number"
-                name="discount_percent"
-                value={product.discount_percent}
-                onChange={handleChange}
-                style={styles.input}
-                placeholder="Example: 20"
-                min="0"
-                max="100"
-              />
-            </div>
+            <InputGroup
+              label="Discount Percent"
+              name="discount_percent"
+              type="number"
+              value={product.discount_percent}
+              onChange={handleChange}
+              placeholder="Example: 20"
+              min="0"
+              max="100"
+            />
 
-            <div>
-              <label style={styles.label}>Discount Start</label>
-              <input
-                type="datetime-local"
-                name="discount_start"
-                value={product.discount_start}
-                onChange={handleChange}
-                style={styles.input}
-              />
-            </div>
+            <InputGroup
+              label="Discount Start"
+              name="discount_start"
+              type="datetime-local"
+              value={product.discount_start}
+              onChange={handleChange}
+            />
 
-            <div>
-              <label style={styles.label}>Discount End</label>
-              <input
-                type="datetime-local"
-                name="discount_end"
-                value={product.discount_end}
-                onChange={handleChange}
-                style={styles.input}
-              />
-            </div>
+            <InputGroup
+              label="Discount End"
+              name="discount_end"
+              type="datetime-local"
+              value={product.discount_end}
+              onChange={handleChange}
+            />
           </div>
         </div>
 
@@ -432,14 +392,18 @@ function AddProduct() {
         )}
 
         <div style={styles.actions}>
-          <button type="submit" style={styles.saveBtn} disabled={saving}>
+          <button
+            type="submit"
+            style={{ ...styles.saveBtn, backgroundColor: theme.primary }}
+            disabled={saving}
+          >
             {saving ? "Saving..." : editId ? "Update Product" : "Add Product"}
           </button>
 
           <button
             type="button"
             style={styles.cancelBtn}
-            onClick={() => navigate("/shop/products")}
+            onClick={() => navigate("/shopowner/products")}
           >
             Cancel
           </button>
@@ -449,26 +413,65 @@ function AddProduct() {
   );
 }
 
+function InputGroup({ label, ...props }) {
+  return (
+    <div>
+      <label style={styles.label}>{label}</label>
+      <input {...props} style={styles.input} />
+    </div>
+  );
+}
+
+function SizeInput({ label, value, onChange, type = "text", placeholder }) {
+  return (
+    <div>
+      <label style={styles.smallLabel}>{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={styles.sizeInput}
+        placeholder={placeholder}
+        min="0"
+      />
+    </div>
+  );
+}
+
 const styles = {
+  page: {
+    width: "100%",
+    maxWidth: "1100px",
+  },
+  header: {
+    marginBottom: "24px",
+  },
+  kicker: {
+    margin: "0 0 6px",
+    fontSize: "13px",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+  },
   title: {
     margin: 0,
-    fontSize: "34px",
+    fontSize: "clamp(28px, 4vw, 38px)",
     color: "#111827",
   },
   desc: {
     color: "#6b7280",
-    marginBottom: "24px",
+    marginTop: "8px",
   },
   form: {
     backgroundColor: "white",
-    padding: "28px",
+    padding: "clamp(18px, 3vw, 28px)",
     borderRadius: "18px",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
-    maxWidth: "980px",
+    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+    border: "1px solid #e5e7eb",
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: "18px",
   },
   label: {
@@ -496,20 +499,21 @@ const styles = {
   },
   textarea: {
     width: "100%",
-    height: "130px",
+    minHeight: "130px",
     padding: "13px",
     borderRadius: "12px",
     border: "1px solid #d1d5db",
     marginBottom: "18px",
     fontSize: "15px",
     boxSizing: "border-box",
+    resize: "vertical",
   },
   sizeSection: {
-    border: "1px solid #e5e7eb",
+    border: "1px solid #bfdbfe",
     borderRadius: "18px",
-    padding: "20px",
+    padding: "clamp(16px, 2.5vw, 20px)",
     marginBottom: "22px",
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#f8fafc",
   },
   sizeHeader: {
     display: "flex",
@@ -517,6 +521,7 @@ const styles = {
     alignItems: "center",
     gap: "16px",
     marginBottom: "16px",
+    flexWrap: "wrap",
   },
   sizeTitle: {
     margin: 0,
@@ -528,7 +533,6 @@ const styles = {
     color: "#6b7280",
   },
   addSizeBtn: {
-    backgroundColor: "#111827",
     color: "white",
     border: "none",
     padding: "11px 16px",
@@ -545,7 +549,7 @@ const styles = {
   },
   sizeRow: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr auto",
+    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
     gap: "12px",
     alignItems: "end",
     backgroundColor: "white",
@@ -570,6 +574,13 @@ const styles = {
     fontWeight: "800",
     cursor: "pointer",
   },
+  discountSection: {
+    border: "1px solid #fde68a",
+    borderRadius: "18px",
+    padding: "clamp(16px, 2.5vw, 20px)",
+    marginBottom: "22px",
+    backgroundColor: "#fffbeb",
+  },
   previewBox: {
     marginBottom: "20px",
   },
@@ -578,8 +589,8 @@ const styles = {
     color: "#374151",
   },
   preview: {
-    width: "220px",
-    height: "150px",
+    width: "min(100%, 260px)",
+    height: "160px",
     objectFit: "cover",
     borderRadius: "14px",
     border: "1px solid #e5e7eb",
@@ -587,9 +598,9 @@ const styles = {
   actions: {
     display: "flex",
     gap: "12px",
+    flexWrap: "wrap",
   },
   saveBtn: {
-    backgroundColor: "#111827",
     color: "white",
     border: "none",
     padding: "13px 20px",
@@ -605,13 +616,6 @@ const styles = {
     borderRadius: "12px",
     fontWeight: "800",
     cursor: "pointer",
-  },
-  discountSection: {
-    border: "1px solid #fde68a",
-    borderRadius: "18px",
-    padding: "20px",
-    marginBottom: "22px",
-    backgroundColor: "#fffbeb",
   },
 };
 

@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -13,7 +11,6 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
     protected $fillable = [
@@ -44,34 +41,20 @@ class User extends Authenticatable
         ];
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Role Name Accessor
-    |--------------------------------------------------------------------------
-    | Uses Spatie roles safely.
-    */
-
     public function getRoleNameAttribute()
     {
-        return $this->roles->first()?->name ?? 'customer';
+        return $this->roles->first()?->name ?? 'user';
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Deliveries
-    |--------------------------------------------------------------------------
-    */
+    public function shop()
+    {
+        return $this->hasOne(Shop::class, 'user_id');
+    }
 
     public function deliveries()
     {
-        return $this->hasMany(Delivery::class, 'delivery_man_id');
+        return $this->hasMany(Delivery::class, 'driver_id');
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | User Notifications
-    |--------------------------------------------------------------------------
-    */
 
     public function userNotifications()
     {

@@ -15,11 +15,10 @@ class AdminSeeder extends Seeder
             [
                 'name' => 'Admin',
                 'password' => Hash::make('L!onHeart#168'),
+                'account_status' => 'active',
             ]
         );
 
-        if (!$admin->hasRole('admin')) {
-            $admin->assignRole('admin');
-        }
+        $admin->syncRoles(['admin']);
     }
 }

@@ -1,29 +1,80 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/Navbar";
+import api from "../../services/api";
 
 const COLORS = {
-  primary: "#E8192C",
+  primary: "#16a34a",
+  primaryDark: "#166534",
+  primaryLight: "#dcfce7",
   dark: "#111827",
   muted: "#6b7280",
-  border: "#e5e7eb",
-  bg: "#f4f6fb",
+  border: "#bbf7d0",
+  softBorder: "#e5e7eb",
+  bg: "#f0fdf4",
   white: "#ffffff",
+  successBg: "#ecfdf5",
+  successText: "#15803d",
+  successBorder: "#bbf7d0",
+  errorBg: "#fef2f2",
+  errorText: "#b91c1c",
+  errorBorder: "#fecaca",
 };
 
 const CustomerProfilePage = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
-    phone: user?.phone || "",
-    address: user?.address || "",
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
   });
 
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState({
+    text: "",
+    type: "success",
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const showMessage = (text, type = "success") => {
+    setMessage({ text, type });
+
+    setTimeout(() => {
+      setMessage({ text: "", type: "success" });
+    }, 3000);
+  };
+
+  const fetchProfile = async () => {
+    try {
+      const res = await api.get("/profile");
+      const user = res.data.user;
+
+      setForm({
+        name: user?.name || "",
+        email: user?.email || "",
+        phone: user?.phone || "",
+        address: user?.address || "",
+      });
+
+      localStorage.setItem("user", JSON.stringify(user));
+    } catch (error) {
+      console.error("Fetch profile error:", error);
+
+      showMessage(
+        error.response?.data?.message || "Failed to load profile.",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     setForm((prev) => ({
@@ -32,12 +83,54 @@ const CustomerProfilePage = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleUpdateProfile = async (e) => {
     e.preventDefault();
+    setSaving(true);
 
-    // Later connect this to Laravel API.
-    setMessage("Profile update function is ready. Connect API when backend is ready.");
+    try {
+      const res = await api.put("/profile", {
+        name: form.name,
+        phone: form.phone,
+        address: form.address,
+      });
+
+      const updatedUser = res.data.user;
+
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+
+      setForm({
+        name: updatedUser?.name || "",
+        email: updatedUser?.email || "",
+        phone: updatedUser?.phone || "",
+        address: updatedUser?.address || "",
+      });
+
+      showMessage(res.data.message || "Profile updated successfully.");
+    } catch (error) {
+      console.error("Profile update error:", error);
+
+      showMessage(
+        error.response?.data?.message || "Failed to update profile.",
+        "error"
+      );
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div style={styles.page}>
+        <Navbar />
+
+        <main style={styles.main}>
+          <div style={styles.card}>
+            <p style={styles.loadingText}>Loading profile...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
@@ -46,28 +139,44 @@ const CustomerProfilePage = () => {
       <main style={styles.main}>
         <div style={styles.header}>
           <div>
+            <p style={styles.kicker}>Customer</p>
             <h1 style={styles.title}>Edit Profile</h1>
             <p style={styles.subtitle}>
               Update your customer account information.
             </p>
           </div>
 
-          <button style={styles.backButton} onClick={() => navigate("/customer/dashboard")}>
+          <button
+            type="button"
+            style={styles.backButton}
+            onClick={() => navigate("/customer/dashboard")}
+          >
             Back to Dashboard
           </button>
         </div>
 
-        <form style={styles.card} onSubmit={handleSubmit}>
-          {message && <div style={styles.message}>{message}</div>}
+        <form style={styles.card} onSubmit={handleUpdateProfile}>
+          {message.text && (
+            <div
+              style={{
+                ...styles.message,
+                ...(message.type === "error"
+                  ? styles.errorMessage
+                  : styles.successMessage),
+              }}
+            >
+              {message.text}
+            </div>
+          )}
 
           <div style={styles.avatarBox}>
             <div style={styles.avatar}>
-              {(user?.name || "U").charAt(0).toUpperCase()}
+              {(form.name || "U").charAt(0).toUpperCase()}
             </div>
 
             <div>
-              <h3 style={styles.avatarName}>{user?.name || "Customer"}</h3>
-              <p style={styles.avatarEmail}>{user?.email}</p>
+              <h3 style={styles.avatarName}>{form.name || "Customer"}</h3>
+              <p style={styles.avatarEmail}>{form.email}</p>
             </div>
           </div>
 
@@ -77,6 +186,7 @@ const CustomerProfilePage = () => {
               name="name"
               value={form.name}
               onChange={handleChange}
+              required
             />
 
             <FormGroup
@@ -85,6 +195,7 @@ const CustomerProfilePage = () => {
               type="email"
               value={form.email}
               onChange={handleChange}
+              disabled
             />
 
             <FormGroup
@@ -92,6 +203,7 @@ const CustomerProfilePage = () => {
               name="phone"
               value={form.phone}
               onChange={handleChange}
+              placeholder="Example: 012345678"
             />
 
             <FormGroup
@@ -99,11 +211,19 @@ const CustomerProfilePage = () => {
               name="address"
               value={form.address}
               onChange={handleChange}
+              placeholder="Enter your delivery address"
             />
           </div>
 
-          <button style={styles.primaryButton} type="submit">
-            Save Changes
+          <button
+            type="submit"
+            style={{
+              ...styles.primaryButton,
+              opacity: saving ? 0.7 : 1,
+            }}
+            disabled={saving}
+          >
+            {saving ? "Saving..." : "Save Changes"}
           </button>
         </form>
       </main>
@@ -111,16 +231,32 @@ const CustomerProfilePage = () => {
   );
 };
 
-function FormGroup({ label, name, value, onChange, type = "text" }) {
+function FormGroup({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+  disabled = false,
+  placeholder = "",
+}) {
   return (
     <div style={styles.formGroup}>
       <label style={styles.label}>{label}</label>
+
       <input
-        style={styles.input}
+        style={{
+          ...styles.input,
+          ...(disabled ? styles.disabledInput : {}),
+        }}
         type={type}
         name={name}
         value={value}
         onChange={onChange}
+        required={required}
+        disabled={disabled}
+        placeholder={placeholder}
       />
     </div>
   );
@@ -131,32 +267,43 @@ const styles = {
     minHeight: "100vh",
     background: COLORS.bg,
   },
-
   main: {
+    width: "100%",
     maxWidth: 900,
     margin: "0 auto",
-    padding: "28px 20px 50px",
+    padding: "clamp(18px, 3vw, 32px)",
+    boxSizing: "border-box",
   },
-
+  kicker: {
+    margin: "0 0 6px",
+    fontSize: 13,
+    fontWeight: 900,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: COLORS.primary,
+  },
+  loadingText: {
+    margin: 0,
+    color: COLORS.muted,
+    fontWeight: 800,
+  },
   header: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 16,
     marginBottom: 22,
+    flexWrap: "wrap",
   },
-
   title: {
     margin: 0,
-    fontSize: 32,
+    fontSize: "clamp(28px, 4vw, 38px)",
     color: COLORS.dark,
   },
-
   subtitle: {
     margin: "6px 0 0",
     color: COLORS.muted,
   },
-
   backButton: {
     background: COLORS.white,
     color: COLORS.dark,
@@ -166,25 +313,29 @@ const styles = {
     fontWeight: 800,
     cursor: "pointer",
   },
-
   card: {
     background: COLORS.white,
     border: `1px solid ${COLORS.border}`,
     borderRadius: 20,
-    padding: 24,
+    padding: "clamp(18px, 3vw, 24px)",
     boxShadow: "0 8px 24px rgba(15,23,42,0.05)",
   },
-
   message: {
-    background: "#ecfdf5",
-    color: "#15803d",
-    border: "1px solid #bbf7d0",
     padding: "12px 14px",
     borderRadius: 12,
     marginBottom: 18,
     fontWeight: 700,
   },
-
+  successMessage: {
+    background: COLORS.successBg,
+    color: COLORS.successText,
+    border: `1px solid ${COLORS.successBorder}`,
+  },
+  errorMessage: {
+    background: COLORS.errorBg,
+    color: COLORS.errorText,
+    border: `1px solid ${COLORS.errorBorder}`,
+  },
   avatarBox: {
     display: "flex",
     alignItems: "center",
@@ -193,8 +344,9 @@ const styles = {
     background: "#f9fafb",
     padding: 16,
     borderRadius: 16,
+    border: `1px solid ${COLORS.softBorder}`,
+    flexWrap: "wrap",
   },
-
   avatar: {
     width: 62,
     height: 62,
@@ -206,45 +358,46 @@ const styles = {
     justifyContent: "center",
     fontSize: 26,
     fontWeight: 900,
+    flexShrink: 0,
   },
-
   avatarName: {
     margin: 0,
     color: COLORS.dark,
   },
-
   avatarEmail: {
     margin: "4px 0 0",
     color: COLORS.muted,
+    overflowWrap: "anywhere",
   },
-
   formGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, 1fr)",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: 16,
     marginBottom: 22,
   },
-
   formGroup: {
     display: "flex",
     flexDirection: "column",
     gap: 8,
   },
-
   label: {
     color: COLORS.dark,
     fontWeight: 800,
     fontSize: 14,
   },
-
   input: {
     border: `1px solid ${COLORS.border}`,
     borderRadius: 12,
     padding: "12px 14px",
     fontSize: 15,
     outline: "none",
+    background: COLORS.white,
   },
-
+  disabledInput: {
+    background: "#f3f4f6",
+    color: COLORS.muted,
+    cursor: "not-allowed",
+  },
   primaryButton: {
     background: COLORS.primary,
     color: COLORS.white,

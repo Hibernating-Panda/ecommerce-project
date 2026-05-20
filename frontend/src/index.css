@@ -38,3 +38,36 @@ code {
     @apply inline-block px-3 py-1 rounded-full text-sm font-medium;
   }
 }
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 800px) {
+  div[style*="minmax(240px, 320px)"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  nav form {
+    order: 3;
+    width: 100%;
+    max-width: none !important;
+    margin: 0 0 10px 0 !important;
+  }
+
+  nav {
+    height: auto !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+}
+
+@media (max-width: 1050px) {
+  section[style*="minmax(170px, 210px)"] {
+    grid-template-columns: 1fr !important;
+  }
+}

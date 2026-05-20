@@ -13,6 +13,11 @@ class ProductSize extends Model
         'stock',
     ];
 
+    protected $casts = [
+        'price' => 'decimal:2',
+        'stock' => 'integer',
+    ];
+
     public function product()
     {
         return $this->belongsTo(Product::class);

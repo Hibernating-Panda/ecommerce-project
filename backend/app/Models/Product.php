@@ -20,10 +20,12 @@ class Product extends Model
         'discount_end',
     ];
 
-    public function sizes()
-    {
-        return $this->hasMany(ProductSize::class);
-    }
+    protected $casts = [
+        'price' => 'decimal:2',
+        'discount_percent' => 'integer',
+        'discount_start' => 'datetime',
+        'discount_end' => 'datetime',
+    ];
 
     public function shop()
     {
@@ -33,6 +35,11 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function sizes()
+    {
+        return $this->hasMany(ProductSize::class);
     }
 
     public function reviews()
@@ -48,5 +55,10 @@ class Product extends Model
     public function wishlists()
     {
         return $this->hasMany(Wishlist::class);
+    }
+
+    public function orderItems()
+    {
+        return $this->hasMany(OrderItem::class);
     }
 }

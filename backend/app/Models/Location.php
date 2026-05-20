@@ -4,30 +4,28 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Location extends Model
 {
     use HasFactory;
+
+    public $timestamps = false;
 
     protected $fillable = [
         'delivery_id',
         'latitude',
         'longitude',
         'address',
-        'timestamp'
+        'timestamp',
     ];
 
-    public $timestamps = false;
-
     protected $casts = [
+        'latitude' => 'decimal:8',
+        'longitude' => 'decimal:8',
         'timestamp' => 'datetime',
     ];
 
-    /**
-     * Get the delivery associated with this location
-     */
-    public function delivery(): BelongsTo
+    public function delivery()
     {
         return $this->belongsTo(Delivery::class);
     }

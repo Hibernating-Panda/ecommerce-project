@@ -1,10 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { roleThemes } from "../../theme/roleThemes";
 
 export default function AdminLayout() {
+  const theme = roleThemes.admin;
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -12,35 +15,37 @@ export default function AdminLayout() {
   };
 
   const navItems = [
-    {
-      label: "Dashboard",
-      path: "/admin",
-      icon: "📊",
-      end: true,
-    },
-    {
-      label: "Users",
-      path: "/admin/users",
-      icon: "👥",
-    },
-    {
-      label: "Products",
-      path: "/admin/products",
-      icon: "📦",
-    },
-    {
-      label: "Categories",
-      path: "/admin/categories",
-      icon: "🏷️",
-    },
+    { label: "Dashboard", path: "/admin/dashboard", icon: "📊", end: true },
+    { label: "Users", path: "/admin/users", icon: "👥" },
+    { label: "Products", path: "/admin/products", icon: "📦" },
+    { label: "Deliveries", path: "/admin/deliveries", icon: "🚚" },
+    { label: "Categories", path: "/admin/categories", icon: "🏷️" },
   ];
 
   return (
-    <div style={styles.wrapper}>
-      <aside style={styles.sidebar}>
+    <div style={{ ...styles.wrapper, backgroundColor: theme.bg }}>
+      <button
+        type="button"
+        style={{ ...styles.menuButton, backgroundColor: theme.primary }}
+        onClick={() => setOpen(true)}
+      >
+        ☰
+      </button>
+
+      {open && <div style={styles.overlay} onClick={() => setOpen(false)} />}
+
+      <aside
+        style={{
+          ...styles.sidebar,
+          transform: open ? "translateX(0)" : undefined,
+          background: `linear-gradient(180deg, ${theme.primaryDark}, #111827)`,
+        }}
+      >
         <div>
           <div style={styles.brandBox}>
-            <div style={styles.logo}>E</div>
+            <div style={{ ...styles.logo, backgroundColor: theme.primary }}>
+              E
+            </div>
 
             <div>
               <h2 style={styles.brandTitle}>E-Shop</h2>
@@ -50,18 +55,20 @@ export default function AdminLayout() {
 
           <NavLink
             to="/admin/profile"
+            onClick={() => setOpen(false)}
             style={({ isActive }) => ({
               ...styles.userBox,
-              ...(isActive ? styles.userBoxActive : {}),
+              ...(isActive
+                ? {
+                    backgroundColor: "rgba(255,255,255,0.18)",
+                    borderColor: theme.border,
+                  }
+                : {}),
             })}
           >
-            <div style={styles.avatar}>
+            <div style={{ ...styles.avatar, backgroundColor: theme.primaryLight, color: theme.primaryDark }}>
               {user?.profile_image ? (
-                <img
-                  src={user.profile_image}
-                  alt={user.name}
-                  style={styles.avatarImage}
-                />
+                <img src={user.profile_image} alt={user.name} style={styles.avatarImage} />
               ) : user?.name ? (
                 user.name.charAt(0).toUpperCase()
               ) : (
@@ -69,7 +76,7 @@ export default function AdminLayout() {
               )}
             </div>
 
-            <div>
+            <div style={styles.userText}>
               <p style={styles.userName}>{user?.name || "Admin"}</p>
               <p style={styles.userRole}>{user?.role || "admin"}</p>
             </div>
@@ -81,9 +88,16 @@ export default function AdminLayout() {
                 key={item.path}
                 to={item.path}
                 end={item.end}
+                onClick={() => setOpen(false)}
                 style={({ isActive }) => ({
                   ...styles.navLink,
-                  ...(isActive ? styles.navLinkActive : {}),
+                  ...(isActive
+                    ? {
+                        backgroundColor: theme.primary,
+                        color: "#ffffff",
+                        boxShadow: "0 8px 16px rgba(220, 38, 38, 0.25)",
+                      }
+                    : {}),
                 })}
               >
                 <span style={styles.navIcon}>{item.icon}</span>
@@ -97,7 +111,7 @@ export default function AdminLayout() {
           <button onClick={handleLogout} style={styles.logoutButton}>
             <span style={styles.navIcon}>🚪</span>
             <span>Logout</span>
-          </button> 
+          </button>
         </div>
       </aside>
 
@@ -111,16 +125,35 @@ export default function AdminLayout() {
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    backgroundColor: "#f5f7fb",
+    width: "100%",
   },
-
+  menuButton: {
+    display: "none",
+    position: "fixed",
+    top: 16,
+    left: 16,
+    zIndex: 1100,
+    border: "none",
+    color: "white",
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    fontSize: 22,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    zIndex: 999,
+  },
   sidebar: {
     position: "fixed",
     top: 0,
     left: 0,
     bottom: 0,
-    width: "260px",
-    background: "linear-gradient(180deg, #111827 0%, #1f2937 100%)",
+    width: 260,
     color: "#ffffff",
     padding: "22px 18px",
     boxSizing: "border-box",
@@ -130,165 +163,145 @@ const styles = {
     boxShadow: "4px 0 18px rgba(0,0,0,0.15)",
     zIndex: 1000,
     overflowY: "auto",
+    transition: "transform 0.25s ease",
   },
-
   brandBox: {
     display: "flex",
     alignItems: "center",
-    gap: "12px",
-    marginBottom: "28px",
+    gap: 12,
+    marginBottom: 28,
   },
-
   logo: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "14px",
-    backgroundColor: "#4f46e5",
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "22px",
-    fontWeight: "800",
-    boxShadow: "0 8px 18px rgba(79,70,229,0.35)",
+    fontSize: 22,
+    fontWeight: 900,
+    boxShadow: "0 8px 18px rgba(220,38,38,0.35)",
   },
-
   brandTitle: {
     margin: 0,
-    fontSize: "22px",
-    fontWeight: "800",
-    letterSpacing: "0.3px",
+    fontSize: 22,
+    fontWeight: 900,
   },
-
   brandSubtitle: {
-    margin: "4px 0 0 0",
-    fontSize: "13px",
-    color: "#9ca3af",
+    margin: "4px 0 0",
+    fontSize: 13,
+    color: "#fecaca",
   },
-
   userBox: {
     display: "flex",
     alignItems: "center",
-    gap: "12px",
+    gap: 12,
     backgroundColor: "rgba(255,255,255,0.08)",
     border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: "16px",
-    padding: "14px",
-    marginBottom: "24px",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 24,
     textDecoration: "none",
     color: "#ffffff",
-    cursor: "pointer",
   },
-
   avatar: {
-    width: "42px",
-    height: "42px",
+    width: 42,
+    height: 42,
     borderRadius: "50%",
-    backgroundColor: "#f59e0b",
-    color: "#111827",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "18px",
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: 900,
     overflow: "hidden",
     flexShrink: 0,
   },
-
-  userName: {
-    margin: 0,
-    fontSize: "15px",
-    fontWeight: "700",
-  },
-
-  userRole: {
-    margin: "4px 0 0 0",
-    fontSize: "12px",
-    color: "#d1d5db",
-    textTransform: "capitalize",
-  },
-
-  nav: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-
-  navLink: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 14px",
-    color: "#d1d5db",
-    textDecoration: "none",
-    borderRadius: "12px",
-    fontSize: "15px",
-    fontWeight: "600",
-    transition: "all 0.2s ease",
-  },
-
-  navLinkActive: {
-    backgroundColor: "#4f46e5",
-    color: "#ffffff",
-    boxShadow: "0 8px 16px rgba(79,70,229,0.25)",
-  },
-
-  navIcon: {
-    width: "22px",
-    display: "inline-flex",
-    justifyContent: "center",
-  },
-
-  bottomSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    paddingTop: "18px",
-    borderTop: "1px solid rgba(255,255,255,0.12)",
-  },
-
-  backLink: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 14px",
-    color: "#d1d5db",
-    textDecoration: "none",
-    borderRadius: "12px",
-    fontSize: "15px",
-    fontWeight: "600",
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-
-  logoutButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 14px",
-    color: "#ffffff",
-    backgroundColor: "#dc2626",
-    border: "none",
-    borderRadius: "12px",
-    fontSize: "15px",
-    fontWeight: "700",
-    cursor: "pointer",
-    textAlign: "left",
-  },
-
-  mainContent: {
-    marginLeft: "260px",
-    minHeight: "100vh",
-    backgroundColor: "#f5f7fb",
-    boxSizing: "border-box",
-  },
-
-  userBoxActive: {
-    backgroundColor: "rgba(79, 70, 229, 0.35)",
-    border: "1px solid rgba(129, 140, 248, 0.55)",
-  },
-
   avatarImage: {
     width: "100%",
     height: "100%",
     objectFit: "cover",
   },
+  userText: {
+    minWidth: 0,
+  },
+  userName: {
+    margin: 0,
+    fontSize: 15,
+    fontWeight: 800,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  userRole: {
+    margin: "4px 0 0",
+    fontSize: 12,
+    color: "#fca5a5",
+    textTransform: "capitalize",
+  },
+  nav: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  navLink: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "12px 14px",
+    color: "#fecaca",
+    textDecoration: "none",
+    borderRadius: 12,
+    fontSize: 15,
+    fontWeight: 700,
+  },
+  navIcon: {
+    width: 22,
+    display: "inline-flex",
+    justifyContent: "center",
+  },
+  bottomSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    paddingTop: 18,
+    borderTop: "1px solid rgba(255,255,255,0.12)",
+  },
+  logoutButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "12px 14px",
+    color: "#ffffff",
+    backgroundColor: "#ef4444",
+    border: "none",
+    borderRadius: 12,
+    fontSize: 15,
+    fontWeight: 800,
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  mainContent: {
+    marginLeft: 260,
+    minHeight: "100vh",
+    boxSizing: "border-box",
+  },
 };
+
+const responsiveStyle = document.createElement("style");
+responsiveStyle.innerHTML = `
+  @media (max-width: 900px) {
+    button[style] {
+      display: block !important;
+    }
+
+    aside[style] {
+      transform: translateX(-100%);
+    }
+
+    main[style] {
+      margin-left: 0 !important;
+      padding-top: 58px !important;
+    }
+  }
+`;
+document.head.appendChild(responsiveStyle);

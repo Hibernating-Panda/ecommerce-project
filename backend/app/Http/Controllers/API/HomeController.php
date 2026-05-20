@@ -9,88 +9,93 @@ class HomeController extends Controller
 {
     public function index()
     {
-        $flashSale = Product::with(['category', 'shop'])
-            ->withAvg('reviews', 'rating')
-            ->withCount('reviews')
-            ->where('discount_percent', '>', 0)
-            ->latest()
-            ->take(12)
-            ->get()
-            ->map(function ($product) {
-                return $this->formatProduct($product);
-            });
-
-        $bestDeal = Product::with(['category', 'shop'])
-            ->withAvg('reviews', 'rating')
-            ->withCount('reviews')
-            ->latest()
-            ->take(12)
-            ->get()
-            ->map(function ($product) {
-                return $this->formatProduct($product);
-            });
-
-        // Since your table may not have total_sold, use latest for now.
-        $trending = Product::with(['category', 'shop'])
-            ->withAvg('reviews', 'rating')
-            ->withCount('reviews')
-            ->latest()
-            ->take(12)
-            ->get()
-            ->map(function ($product) {
-                return $this->formatProduct($product);
-            });
-
         return response()->json([
-            'flash_sale' => $flashSale,
-            'best_deal' => $bestDeal,
-            'trending' => $trending,
+            'flash_sale' => $this->flashSaleProducts(),
+            'best_deal' => $this->latestProducts(),
+            'trending' => $this->trendingProducts(),
         ]);
+    }
+
+    private function baseProductQuery()
+    {
+        return Product::with(['category', 'shop'])
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
+            ->where('status', 'active');
+    }
+
+    private function flashSaleProducts()
+    {
+        return $this->baseProductQuery()
+            ->where('discount_percent', '>', 0)
+            ->where(function ($query) {
+                $query->whereNull('discount_start')
+                    ->orWhere('discount_start', '<=', now());
+            })
+            ->where(function ($query) {
+                $query->whereNull('discount_end')
+                    ->orWhere('discount_end', '>=', now());
+            })
+            ->latest()
+            ->take(12)
+            ->get()
+            ->map(fn ($product) => $this->formatProduct($product));
+    }
+
+    private function latestProducts()
+    {
+        return $this->baseProductQuery()
+            ->latest()
+            ->take(12)
+            ->get()
+            ->map(fn ($product) => $this->formatProduct($product));
+    }
+
+    private function trendingProducts()
+    {
+        return $this->baseProductQuery()
+            ->withSum('orderItems as total_sold', 'quantity')
+            ->orderByDesc('total_sold')
+            ->latest()
+            ->take(12)
+            ->get()
+            ->map(fn ($product) => $this->formatProduct($product));
     }
 
     private function formatProduct($product)
     {
-        $image = $product->image ?? $product->thumbnail ?? null;
+        $image = $product->image;
 
         return [
             'id' => $product->id,
             'shop_id' => $product->shop_id,
             'category_id' => $product->category_id,
-
             'name' => $product->name,
             'description' => $product->description,
-
             'price' => $product->price,
-            'stock' => $product->stock ?? 0,
-
+            'stock' => $product->stock,
             'image' => $image,
             'thumbnail' => $image,
-            'image_url' => $this->getImageUrl($image),
-
+            'image_url' => $this->imageUrl($image),
             'discount_percent' => $product->discount_percent ?? 0,
-            'discount_start' => $product->discount_start ?? null,
-            'discount_end' => $product->discount_end ?? null,
-
-            'total_sold' => 0,
-            'sold' => 0,
-
+            'discount_start' => $product->discount_start,
+            'discount_end' => $product->discount_end,
+            'total_sold' => (int) ($product->total_sold ?? 0),
+            'sold' => (int) ($product->total_sold ?? 0),
             'average_rating' => $product->reviews_avg_rating
                 ? round($product->reviews_avg_rating, 1)
                 : null,
-
             'reviews_count' => $product->reviews_count ?? 0,
-
             'category' => $product->category,
             'shop' => $product->shop,
-
             'created_at' => $product->created_at,
             'updated_at' => $product->updated_at,
         ];
     }
 
-    private function getImageUrl($image)
+    private function imageUrl(?string $image)
     {
-        if (!$image) {
+        if (! $image) {
             return null;
         }
 
@@ -98,10 +103,8 @@ class HomeController extends Controller
             return $image;
         }
 
-        if (str_starts_with($image, 'storage/')) {
-            return asset($image);
-        }
-
-        return asset('storage/' . $image);
+        return str_starts_with($image, 'storage/')
+            ? asset($image)
+            : asset('storage/' . $image);
     }
 }

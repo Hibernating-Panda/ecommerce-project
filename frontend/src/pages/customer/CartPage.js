@@ -87,6 +87,27 @@ const CartPage = () => {
     }
   };
 
+  const placeOrder = async () => {
+    try {
+      const res = await fetch(`${API_URL}/orders`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({}),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to place order");
+      }
+
+      showMessage("Order placed successfully.");
+      navigate("/customer/orders");
+    } catch (error) {
+      showMessage(error.message || "Failed to place order");
+    }
+  };
+
   const total = cartItems.reduce((sum, item) => {
     return sum + Number(item.product?.price || 0) * Number(item.quantity || 1);
   }, 0);
@@ -101,7 +122,7 @@ const CartPage = () => {
         <div style={styles.header}>
           <div>
             <h1 style={styles.title}>My Cart</h1>
-            <p style={styles.subtitle}>Review products before checkout.</p>
+            <p style={styles.subtitle}>Review products before ordering.</p>
           </div>
 
           <button style={styles.backButton} onClick={() => navigate("/")}>
@@ -169,8 +190,8 @@ const CartPage = () => {
                 <strong style={styles.total}>${total.toFixed(2)}</strong>
               </div>
 
-              <button style={styles.primaryButton} onClick={() => navigate("/checkout")}>
-                Checkout
+              <button style={styles.primaryButton} onClick={placeOrder}>
+                Order
               </button>
             </div>
           </div>
@@ -339,6 +360,25 @@ const styles = {
     borderRadius: 12,
     fontWeight: 900,
     cursor: "pointer",
+  },
+
+  paymentBox: {
+    margin: "16px 0",
+  },
+
+  paymentLabel: {
+    display: "block",
+    marginBottom: 8,
+    fontWeight: 800,
+    color: COLORS.dark,
+  },
+
+  paymentSelect: {
+    width: "100%",
+    border: `1px solid ${COLORS.border}`,
+    borderRadius: 12,
+    padding: "11px",
+    fontWeight: 700,
   },
 };
 

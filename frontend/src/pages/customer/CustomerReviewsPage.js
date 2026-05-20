@@ -4,12 +4,16 @@ import Navbar from "../../components/Navbar";
 import { API_URL, authHeaders } from "../../services/api";
 
 const COLORS = {
-  primary: "#E8192C",
+  primary: "#16a34a",
+  primaryDark: "#166534",
+  primaryLight: "#dcfce7",
   dark: "#111827",
   muted: "#6b7280",
-  border: "#e5e7eb",
-  bg: "#f4f6fb",
+  border: "#bbf7d0",
+  softBorder: "#e5e7eb",
+  bg: "#f0fdf4",
   white: "#ffffff",
+  red: "#dc2626",
 };
 
 const CustomerReviewsPage = () => {
@@ -47,17 +51,17 @@ const CustomerReviewsPage = () => {
       const shopData = await shopRes.json();
 
       if (!productRes.ok) {
-        throw new Error(productData.message || "Failed to load product reviews");
+        throw new Error(productData.message || "Failed to load product reviews.");
       }
 
       if (!shopRes.ok) {
-        throw new Error(shopData.message || "Failed to load shop reviews");
+        throw new Error(shopData.message || "Failed to load shop reviews.");
       }
 
-      setProductReviews(productData.product_reviews || []);
-      setShopReviews(shopData.shop_reviews || []);
+      setProductReviews(productData.product_reviews?.data || productData.product_reviews || []);
+      setShopReviews(shopData.shop_reviews?.data || shopData.shop_reviews || []);
     } catch (error) {
-      showMessage(error.message || "Failed to load reviews");
+      showMessage(error.message || "Failed to load reviews.");
     } finally {
       setLoading(false);
     }
@@ -74,13 +78,15 @@ const CustomerReviewsPage = () => {
       <main style={styles.main}>
         <div style={styles.header}>
           <div>
+            <p style={styles.kicker}>Customer</p>
             <h1 style={styles.title}>My Reviews</h1>
             <p style={styles.subtitle}>
-              View your real product reviews and shop reviews.
+              View your product reviews and shop reviews.
             </p>
           </div>
 
           <button
+            type="button"
             style={styles.backButton}
             onClick={() => navigate("/customer/dashboard")}
           >
@@ -90,6 +96,7 @@ const CustomerReviewsPage = () => {
 
         <div style={styles.tabs}>
           <button
+            type="button"
             style={{
               ...styles.tabButton,
               ...(activeTab === "product" ? styles.activeTab : {}),
@@ -100,6 +107,7 @@ const CustomerReviewsPage = () => {
           </button>
 
           <button
+            type="button"
             style={{
               ...styles.tabButton,
               ...(activeTab === "shop" ? styles.activeTab : {}),
@@ -161,7 +169,10 @@ function ReviewCard({ review, type, navigate }) {
 
   const image = isProduct
     ? review.product?.image_url || review.product?.image || "/no-image.png"
-    : review.shop?.logo_url || review.shop?.logo || review.shop?.image || "/no-image.png";
+    : review.shop?.logo_url ||
+      review.shop?.logo ||
+      review.shop?.image ||
+      "/no-image.png";
 
   const handleView = () => {
     if (isProduct && review.product_id) {
@@ -188,7 +199,7 @@ function ReviewCard({ review, type, navigate }) {
           />
         </div>
 
-        <div style={{ flex: 1 }}>
+        <div style={styles.reviewBody}>
           <div style={styles.reviewTop}>
             <div>
               <h3 style={styles.reviewTitle}>{title}</h3>
@@ -198,7 +209,7 @@ function ReviewCard({ review, type, navigate }) {
             <div style={styles.rating}>⭐ {review.rating}</div>
           </div>
 
-          <p style={styles.comment}>{review.comment}</p>
+          <p style={styles.comment}>{review.comment || "No comment."}</p>
 
           <div style={styles.footer}>
             <span style={styles.date}>
@@ -207,7 +218,7 @@ function ReviewCard({ review, type, navigate }) {
                 : ""}
             </span>
 
-            <button style={styles.viewButton} onClick={handleView}>
+            <button type="button" style={styles.viewButton} onClick={handleView}>
               View {isProduct ? "Product" : "Shop"}
             </button>
           </div>
@@ -223,7 +234,7 @@ function EmptyState({ icon, title, text, buttonText, onClick }) {
       <div style={styles.emptyIcon}>{icon}</div>
       <h2 style={styles.emptyTitle}>{title}</h2>
       <p style={styles.emptyText}>{text}</p>
-      <button style={styles.primaryButton} onClick={onClick}>
+      <button type="button" style={styles.primaryButton} onClick={onClick}>
         {buttonText}
       </button>
     </div>
@@ -235,13 +246,13 @@ const styles = {
     minHeight: "100vh",
     background: COLORS.bg,
   },
-
   main: {
+    width: "100%",
     maxWidth: 1100,
     margin: "0 auto",
-    padding: "28px 20px 50px",
+    padding: "clamp(18px, 3vw, 32px)",
+    boxSizing: "border-box",
   },
-
   toast: {
     position: "fixed",
     top: 90,
@@ -254,26 +265,31 @@ const styles = {
     boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
     fontWeight: 800,
   },
-
   header: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 16,
     marginBottom: 22,
+    flexWrap: "wrap",
   },
-
+  kicker: {
+    margin: "0 0 6px",
+    fontSize: 13,
+    fontWeight: 900,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: COLORS.primary,
+  },
   title: {
     margin: 0,
-    fontSize: 32,
+    fontSize: "clamp(28px, 4vw, 38px)",
     color: COLORS.dark,
   },
-
   subtitle: {
     margin: "6px 0 0",
     color: COLORS.muted,
   },
-
   backButton: {
     background: COLORS.white,
     color: COLORS.dark,
@@ -283,7 +299,6 @@ const styles = {
     fontWeight: 800,
     cursor: "pointer",
   },
-
   tabs: {
     background: COLORS.white,
     border: `1px solid ${COLORS.border}`,
@@ -293,8 +308,9 @@ const styles = {
     gap: 8,
     marginBottom: 20,
     width: "fit-content",
+    maxWidth: "100%",
+    flexWrap: "wrap",
   },
-
   tabButton: {
     border: "none",
     background: "transparent",
@@ -304,12 +320,10 @@ const styles = {
     fontWeight: 800,
     color: COLORS.muted,
   },
-
   activeTab: {
     background: COLORS.primary,
     color: COLORS.white,
   },
-
   loadingCard: {
     background: COLORS.white,
     border: `1px solid ${COLORS.border}`,
@@ -319,27 +333,24 @@ const styles = {
     textAlign: "center",
     fontWeight: 700,
   },
-
   reviewList: {
     display: "flex",
     flexDirection: "column",
     gap: 14,
   },
-
   reviewCard: {
     background: COLORS.white,
     border: `1px solid ${COLORS.border}`,
     borderRadius: 18,
-    padding: 18,
+    padding: "clamp(14px, 2.5vw, 18px)",
     boxShadow: "0 8px 24px rgba(15,23,42,0.05)",
   },
-
   reviewContent: {
     display: "flex",
     gap: 16,
     alignItems: "flex-start",
+    flexWrap: "wrap",
   },
-
   imageBox: {
     width: 90,
     height: 90,
@@ -347,70 +358,66 @@ const styles = {
     background: "#f9fafb",
     overflow: "hidden",
     flexShrink: 0,
-    border: `1px solid ${COLORS.border}`,
+    border: `1px solid ${COLORS.softBorder}`,
   },
-
   image: {
     width: "100%",
     height: "100%",
     objectFit: "cover",
   },
-
+  reviewBody: {
+    flex: 1,
+    minWidth: 220,
+  },
   reviewTop: {
     display: "flex",
     justifyContent: "space-between",
     gap: 16,
     alignItems: "flex-start",
+    flexWrap: "wrap",
   },
-
   reviewTitle: {
     margin: 0,
     color: COLORS.dark,
   },
-
   reviewType: {
     margin: "4px 0 0",
     color: COLORS.muted,
     fontSize: 13,
   },
-
   rating: {
-    background: "#fff0f1",
-    color: COLORS.primary,
+    background: COLORS.primaryLight,
+    color: COLORS.primaryDark,
     padding: "8px 12px",
     borderRadius: 999,
     fontWeight: 900,
     whiteSpace: "nowrap",
   },
-
   comment: {
     color: COLORS.dark,
     lineHeight: 1.6,
     margin: "12px 0",
   },
-
   footer: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 12,
+    flexWrap: "wrap",
   },
-
   date: {
     color: COLORS.muted,
     fontSize: 13,
   },
-
   viewButton: {
-    background: "#fff0f1",
-    color: COLORS.primary,
+    background: COLORS.primaryLight,
+    color: COLORS.primaryDark,
     border: "none",
     padding: "8px 14px",
     borderRadius: 999,
     fontWeight: 800,
     cursor: "pointer",
   },
-
   emptyCard: {
     background: COLORS.white,
     border: `1px solid ${COLORS.border}`,
@@ -419,22 +426,18 @@ const styles = {
     textAlign: "center",
     boxShadow: "0 8px 24px rgba(15,23,42,0.05)",
   },
-
   emptyIcon: {
     fontSize: 56,
     marginBottom: 14,
   },
-
   emptyTitle: {
     margin: 0,
     color: COLORS.dark,
   },
-
   emptyText: {
     color: COLORS.muted,
     margin: "10px 0 22px",
   },
-
   primaryButton: {
     background: COLORS.primary,
     color: COLORS.white,

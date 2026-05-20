@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from "react";
 import api from "../../services/api";
+import { roleThemes } from "../../theme/roleThemes";
 
 export default function AdminCategories() {
+  const theme = roleThemes.admin;
+
   const [categories, setCategories] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -16,13 +21,26 @@ export default function AdminCategories() {
     description: "",
   });
 
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
   const fetchCategories = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await api.get("/admin/categories");
-      setCategories(response.data);
+      const response = await api.get("/admin/categories", {
+        params: {
+          search: search || undefined,
+        },
+      });
+
+      setCategories(
+        Array.isArray(response.data) ? response.data : response.data.data || []
+      );
+
+      setMeta(response.data?.meta || response.data || null);
     } catch (error) {
       console.log(error.response?.data || error);
       setError("Failed to load categories.");
@@ -40,15 +58,13 @@ export default function AdminCategories() {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [e.target.name]: e.target.value,
     }));
   };
 
-  const createCategory = async (e) => {
+  const saveCategory = async (e) => {
     e.preventDefault();
 
     try {
@@ -56,14 +72,22 @@ export default function AdminCategories() {
       setMessage("");
       setError("");
 
-      await api.post("/admin/categories", formData);
+      if (editingCategory) {
+        await api.put(`/admin/categories/${editingCategory.id}`, formData);
+        setMessage("Category updated successfully.");
+      } else {
+        await api.post("/admin/categories", formData);
+        setMessage("Category created successfully.");
+      }
 
-      setMessage("Category created successfully.");
       resetForm();
       fetchCategories();
     } catch (error) {
       console.log(error.response?.data || error);
-      setError(error.response?.data?.message || "Failed to create category.");
+      setError(
+        error.response?.data?.message ||
+          `Failed to ${editingCategory ? "update" : "create"} category.`
+      );
     } finally {
       setSaving(false);
     }
@@ -83,31 +107,8 @@ export default function AdminCategories() {
     });
   };
 
-  const updateCategory = async (e) => {
-    e.preventDefault();
-
-    if (!editingCategory) return;
-
-    try {
-      setSaving(true);
-      setMessage("");
-      setError("");
-
-      await api.put(`/admin/categories/${editingCategory.id}`, formData);
-
-      setMessage("Category updated successfully.");
-      resetForm();
-      fetchCategories();
-    } catch (error) {
-      console.log(error.response?.data || error);
-      setError(error.response?.data?.message || "Failed to update category.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const deleteCategory = async (id) => {
-    if (!window.confirm("Delete this category? Products in this category will become uncategorized.")) {
+    if (!window.confirm("Delete this category?")) {
       return;
     }
 
@@ -125,21 +126,25 @@ export default function AdminCategories() {
     }
   };
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
+  const clearSearch = () => {
+    setSearch("");
+  };
 
   return (
     <div style={styles.page}>
       <div style={styles.header}>
         <div>
-          <h1 style={styles.title}>Manage Categories</h1>
+          <p style={{ ...styles.kicker, color: theme.primary }}>Admin</p>
+          <h1 style={styles.title}>Categories</h1>
           <p style={styles.subtitle}>
-            Create and organize product categories for the e-commerce catalog.
+            Create, edit, delete, and search product categories.
           </p>
         </div>
 
-        <button onClick={fetchCategories} style={styles.refreshButton}>
+        <button
+          onClick={fetchCategories}
+          style={{ ...styles.refreshButton, backgroundColor: theme.primary }}
+        >
           Refresh
         </button>
       </div>
@@ -165,7 +170,7 @@ export default function AdminCategories() {
           )}
         </div>
 
-        <form onSubmit={editingCategory ? updateCategory : createCategory}>
+        <form onSubmit={saveCategory}>
           <div style={styles.formGrid}>
             <div style={styles.formGroup}>
               <label style={styles.label}>Category Name</label>
@@ -193,7 +198,11 @@ export default function AdminCategories() {
             </div>
           </div>
 
-          <button type="submit" disabled={saving} style={styles.submitButton}>
+          <button
+            type="submit"
+            disabled={saving}
+            style={{ ...styles.submitButton, backgroundColor: theme.primary }}
+          >
             {saving
               ? "Saving..."
               : editingCategory
@@ -203,16 +212,45 @@ export default function AdminCategories() {
         </form>
       </div>
 
+      <div style={styles.filterCard}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search category name..."
+          style={styles.input}
+        />
+
+        <button
+          onClick={fetchCategories}
+          style={{ ...styles.searchButton, backgroundColor: theme.primary }}
+        >
+          Search
+        </button>
+
+        <button onClick={clearSearch} style={styles.clearButton}>
+          Clear
+        </button>
+      </div>
+
       <div style={styles.tableCard}>
         <div style={styles.tableHeader}>
           <div>
             <h2 style={styles.tableTitle}>Category List</h2>
             <p style={styles.tableSubtitle}>
-              Total categories: {categories.length}
+              Total categories: {meta?.total || categories.length}
             </p>
           </div>
 
-          <span style={styles.countBadge}>{categories.length} categories</span>
+          <span
+            style={{
+              ...styles.countBadge,
+              backgroundColor: theme.primaryLight,
+              color: theme.primaryDark,
+            }}
+          >
+            {meta?.total || categories.length} categories
+          </span>
         </div>
 
         {loading ? (
@@ -222,41 +260,49 @@ export default function AdminCategories() {
         ) : (
           <div style={styles.categoryGrid}>
             {categories.map((category) => (
-            <div key={category.id} style={styles.categoryCard}>
-              <div style={styles.categoryLeft}>
-                <div style={styles.categoryIcon}>
-                  {category.name?.charAt(0).toUpperCase()}
+              <div key={category.id} style={styles.categoryCard}>
+                <div style={styles.categoryLeft}>
+                  <div
+                    style={{
+                      ...styles.categoryIcon,
+                      backgroundColor: theme.primary,
+                    }}
+                  >
+                    {category.name?.charAt(0).toUpperCase()}
+                  </div>
+
+                  <div style={styles.categoryBody}>
+                    <h3 style={styles.categoryName}>{category.name}</h3>
+                    <p style={styles.categorySlug}>/{category.slug}</p>
+                    <p style={styles.categoryDescription}>
+                      {category.description || "No description provided."}
+                    </p>
+                    <p style={styles.productCount}>
+                      Products: {category.products_count ?? 0}
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <h3 style={styles.categoryName}>{category.name}</h3>
-                  <p style={styles.categorySlug}>/{category.slug}</p>
-                  <p style={styles.categoryDescription}>
-                    {category.description || "No description provided."}
-                  </p>
+                <div style={styles.categoryRight}>
+                  <span style={styles.idBadge}>#{category.id}</span>
+
+                  <div style={styles.actionGroup}>
+                    <button
+                      onClick={() => startEdit(category)}
+                      style={styles.editButton}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => deleteCategory(category.id)}
+                      style={styles.deleteButton}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              <div style={styles.categoryRight}>
-                <span style={styles.idBadge}>#{category.id}</span>
-
-                <div style={styles.actionGroup}>
-                  <button
-                    onClick={() => startEdit(category)}
-                    style={styles.editButton}
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() => deleteCategory(category.id)}
-                    style={styles.deleteButton}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
             ))}
           </div>
         )}
@@ -267,41 +313,42 @@ export default function AdminCategories() {
 
 const styles = {
   page: {
-    padding: "24px",
-    backgroundColor: "#f5f7fb",
+    padding: "clamp(16px, 2.5vw, 28px)",
     minHeight: "100vh",
+    boxSizing: "border-box",
   },
-
   header: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: "20px",
     gap: "12px",
     flexWrap: "wrap",
   },
-
+  kicker: {
+    margin: "0 0 6px",
+    fontSize: "13px",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+  },
   title: {
     margin: 0,
-    fontSize: "30px",
+    fontSize: "clamp(28px, 4vw, 38px)",
     color: "#111827",
   },
-
   subtitle: {
-    margin: "8px 0 0 0",
+    margin: "8px 0 0",
     color: "#6b7280",
   },
-
   refreshButton: {
     padding: "10px 16px",
     border: "none",
     borderRadius: "10px",
-    backgroundColor: "#111827",
     color: "#ffffff",
     cursor: "pointer",
-    fontWeight: "700",
+    fontWeight: "800",
   },
-
   successBox: {
     backgroundColor: "#dcfce7",
     color: "#166534",
@@ -310,7 +357,6 @@ const styles = {
     borderRadius: "12px",
     marginBottom: "16px",
   },
-
   errorBox: {
     backgroundColor: "#fee2e2",
     color: "#991b1b",
@@ -319,16 +365,14 @@ const styles = {
     borderRadius: "12px",
     marginBottom: "16px",
   },
-
   formCard: {
     backgroundColor: "#ffffff",
     borderRadius: "16px",
     padding: "22px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
     border: "1px solid #eef1f6",
-    marginBottom: "24px",
+    marginBottom: "20px",
   },
-
   formHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -337,73 +381,93 @@ const styles = {
     gap: "12px",
     flexWrap: "wrap",
   },
-
   formTitle: {
     margin: 0,
     fontSize: "20px",
     color: "#111827",
   },
-
   formSubtitle: {
-    margin: "6px 0 0 0",
+    margin: "6px 0 0",
     fontSize: "14px",
     color: "#6b7280",
   },
-
   cancelButton: {
     padding: "9px 14px",
     borderRadius: "10px",
     border: "1px solid #d1d5db",
     backgroundColor: "#ffffff",
     cursor: "pointer",
-    fontWeight: "700",
+    fontWeight: "800",
   },
-
   formGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: "16px",
     marginBottom: "18px",
   },
-
   formGroup: {
     display: "flex",
     flexDirection: "column",
     gap: "7px",
   },
-
   label: {
     fontSize: "14px",
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#374151",
   },
-
   input: {
     padding: "11px 12px",
     borderRadius: "10px",
     border: "1px solid #d1d5db",
     outline: "none",
     fontSize: "14px",
+    width: "100%",
+    boxSizing: "border-box",
+    backgroundColor: "white",
   },
-
   submitButton: {
     padding: "11px 18px",
     borderRadius: "10px",
     border: "none",
-    backgroundColor: "#4f46e5",
     color: "#ffffff",
     cursor: "pointer",
     fontWeight: "800",
   },
-
+  filterCard: {
+    display: "grid",
+    gridTemplateColumns: "minmax(220px, 1fr) auto auto",
+    gap: "12px",
+    backgroundColor: "#ffffff",
+    borderRadius: "16px",
+    padding: "18px",
+    boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
+    border: "1px solid #eef1f6",
+    marginBottom: "20px",
+  },
+  searchButton: {
+    padding: "11px 16px",
+    borderRadius: "10px",
+    border: "none",
+    color: "white",
+    fontWeight: "800",
+    cursor: "pointer",
+  },
+  clearButton: {
+    padding: "11px 16px",
+    borderRadius: "10px",
+    border: "1px solid #d1d5db",
+    backgroundColor: "white",
+    color: "#374151",
+    fontWeight: "800",
+    cursor: "pointer",
+  },
   tableCard: {
     backgroundColor: "#ffffff",
     borderRadius: "16px",
     padding: "22px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
     border: "1px solid #eef1f6",
   },
-
   tableHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -412,34 +476,27 @@ const styles = {
     gap: "12px",
     flexWrap: "wrap",
   },
-
   tableTitle: {
     margin: 0,
     fontSize: "20px",
     color: "#111827",
   },
-
   tableSubtitle: {
-    margin: "6px 0 0 0",
+    margin: "6px 0 0",
     color: "#6b7280",
     fontSize: "14px",
   },
-
   countBadge: {
-    backgroundColor: "#eef2ff",
-    color: "#4338ca",
     padding: "8px 12px",
     borderRadius: "999px",
     fontSize: "13px",
     fontWeight: "800",
   },
-
   loadingBox: {
     padding: "30px",
     textAlign: "center",
     color: "#6b7280",
   },
-
   emptyBox: {
     padding: "30px",
     textAlign: "center",
@@ -447,13 +504,11 @@ const styles = {
     backgroundColor: "#f9fafb",
     borderRadius: "12px",
   },
-
   categoryGrid: {
     display: "flex",
     flexDirection: "column",
     gap: "14px",
   },
-
   categoryCard: {
     display: "flex",
     justifyContent: "space-between",
@@ -463,53 +518,27 @@ const styles = {
     borderRadius: "16px",
     border: "1px solid #e5e7eb",
     backgroundColor: "#ffffff",
-    boxShadow: "0 3px 10px rgba(0,0,0,0.04)",
+    boxShadow: "0 3px 10px rgba(15,23,42,0.04)",
+    flexWrap: "wrap",
   },
-
   categoryLeft: {
     display: "flex",
     alignItems: "center",
     gap: "16px",
     flex: 1,
-    minWidth: 0,
+    minWidth: 240,
   },
-
   categoryRight: {
     display: "flex",
     alignItems: "center",
     gap: "14px",
     flexShrink: 0,
+    flexWrap: "wrap",
   },
-
-  categoryName: {
-    margin: 0,
-    color: "#111827",
-    fontSize: "18px",
-  },
-
-  categorySlug: {
-    margin: "4px 0 0 0",
-    color: "#6b7280",
-    fontSize: "13px",
-  },
-
-  categoryDescription: {
-    margin: "6px 0 0 0",
-    color: "#6b7280",
-    fontSize: "14px",
-    lineHeight: "1.4",
-  },
-
-  actionGroup: {
-    display: "flex",
-    gap: "8px",
-  },
-
   categoryIcon: {
     width: "52px",
     height: "52px",
     borderRadius: "16px",
-    backgroundColor: "#4f46e5",
     color: "#ffffff",
     display: "flex",
     alignItems: "center",
@@ -518,19 +547,37 @@ const styles = {
     fontWeight: "900",
     flexShrink: 0,
   },
-
   categoryBody: {
     flex: 1,
     minWidth: 0,
   },
-
-  categoryTop: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "10px",
-    marginBottom: "8px",
+  categoryName: {
+    margin: 0,
+    color: "#111827",
+    fontSize: "18px",
   },
-
+  categorySlug: {
+    margin: "4px 0 0",
+    color: "#6b7280",
+    fontSize: "13px",
+  },
+  categoryDescription: {
+    margin: "6px 0 0",
+    color: "#6b7280",
+    fontSize: "14px",
+    lineHeight: "1.4",
+  },
+  productCount: {
+    margin: "6px 0 0",
+    color: "#991b1b",
+    fontSize: "13px",
+    fontWeight: "800",
+  },
+  actionGroup: {
+    display: "flex",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
   idBadge: {
     backgroundColor: "#f3f4f6",
     color: "#374151",
@@ -540,9 +587,7 @@ const styles = {
     fontWeight: "800",
     height: "fit-content",
   },
-
   editButton: {
-    flex: 1,
     padding: "9px 12px",
     borderRadius: "10px",
     border: "none",
@@ -551,9 +596,7 @@ const styles = {
     cursor: "pointer",
     fontWeight: "800",
   },
-
   deleteButton: {
-    flex: 1,
     padding: "9px 12px",
     borderRadius: "10px",
     border: "none",

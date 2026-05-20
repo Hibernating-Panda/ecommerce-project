@@ -4,11 +4,14 @@ import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/Navbar";
 
 const COLORS = {
-  primary: "#E8192C",
+  primary: "#16a34a",
+  primaryDark: "#166534",
+  primaryLight: "#dcfce7",
   dark: "#111827",
   muted: "#6b7280",
-  border: "#e5e7eb",
-  bg: "#f4f6fb",
+  border: "#bbf7d0",
+  softBorder: "#e5e7eb",
+  bg: "#f0fdf4",
   white: "#ffffff",
 };
 
@@ -25,7 +28,6 @@ const DashboardPage = () => {
       <Navbar />
 
       <main style={styles.main}>
-        {/* HERO */}
         <section style={styles.heroCard}>
           <div>
             <div style={styles.badge}>Customer Account</div>
@@ -40,11 +42,16 @@ const DashboardPage = () => {
             </p>
 
             <div style={styles.heroActions}>
-              <button style={styles.primaryButton} onClick={() => navigate("/")}>
+              <button
+                type="button"
+                style={styles.primaryButton}
+                onClick={() => navigate("/")}
+              >
                 Browse Store
               </button>
 
               <button
+                type="button"
                 style={styles.lightButton}
                 onClick={() => navigate("/customer/orders")}
               >
@@ -58,7 +65,6 @@ const DashboardPage = () => {
           </div>
         </section>
 
-        {/* STATS */}
         <section style={styles.statsGrid}>
           <StatCard
             icon="📦"
@@ -85,9 +91,7 @@ const DashboardPage = () => {
           />
         </section>
 
-        {/* MAIN CONTENT */}
         <section style={styles.contentGrid}>
-          {/* PROFILE */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
@@ -96,6 +100,7 @@ const DashboardPage = () => {
               </div>
 
               <button
+                type="button"
                 style={styles.smallButton}
                 onClick={() => navigate("/customer/profile")}
               >
@@ -108,8 +113,10 @@ const DashboardPage = () => {
                 {(user?.name || "U").charAt(0).toUpperCase()}
               </div>
 
-              <div>
-                <h3 style={styles.profileName}>{user?.name || "Unknown User"}</h3>
+              <div style={styles.profileInfo}>
+                <h3 style={styles.profileName}>
+                  {user?.name || "Unknown User"}
+                </h3>
                 <p style={styles.profileEmail}>{user?.email || "No email"}</p>
               </div>
             </div>
@@ -122,7 +129,6 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          {/* QUICK ACTIONS */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
@@ -170,7 +176,6 @@ const DashboardPage = () => {
           </div>
         </section>
 
-        {/* STATUS */}
         <section style={styles.statusCard}>
           <div style={styles.statusIcon}>✅</div>
 
@@ -190,10 +195,10 @@ const DashboardPage = () => {
 
 function StatCard({ icon, title, value, text, onClick }) {
   return (
-    <button style={styles.statCard} onClick={onClick}>
+    <button type="button" style={styles.statCard} onClick={onClick}>
       <div style={styles.statIcon}>{icon}</div>
 
-      <div style={{ textAlign: "left" }}>
+      <div style={styles.statContent}>
         <p style={styles.statTitle}>{title}</p>
         <h2 style={styles.statValue}>{value}</h2>
         <p style={styles.statText}>{text}</p>
@@ -209,7 +214,7 @@ function InfoRow({ label, value, success }) {
       <span
         style={{
           ...styles.infoValue,
-          color: success ? "#15803d" : COLORS.dark,
+          color: success ? COLORS.primaryDark : COLORS.dark,
         }}
       >
         {value}
@@ -220,10 +225,10 @@ function InfoRow({ label, value, success }) {
 
 function ActionItem({ icon, title, text, onClick }) {
   return (
-    <button style={styles.actionItem} onClick={onClick}>
+    <button type="button" style={styles.actionItem} onClick={onClick}>
       <div style={styles.actionIcon}>{icon}</div>
 
-      <div style={{ textAlign: "left" }}>
+      <div style={styles.actionContent}>
         <h3 style={styles.actionTitle}>{title}</h3>
         <p style={styles.actionText}>{text}</p>
       </div>
@@ -237,36 +242,36 @@ const styles = {
   page: {
     minHeight: "100vh",
     background:
-      "radial-gradient(circle at top left, rgba(232,25,44,0.08), transparent 30%), #f4f6fb",
+      "radial-gradient(circle at top left, rgba(22,163,74,0.12), transparent 32%), #f0fdf4",
     color: COLORS.dark,
   },
-
   main: {
+    width: "100%",
     maxWidth: 1200,
     margin: "0 auto",
-    padding: "28px 20px 50px",
+    padding: "clamp(18px, 3vw, 32px)",
+    boxSizing: "border-box",
   },
-
   heroCard: {
     background:
-      "linear-gradient(135deg, #111827 0%, #1f2937 55%, #E8192C 100%)",
+      "linear-gradient(135deg, #166534 0%, #15803d 55%, #16a34a 100%)",
     borderRadius: 24,
-    padding: "34px 38px",
+    padding: "clamp(24px, 4vw, 38px)",
     color: COLORS.white,
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 24,
-    boxShadow: "0 20px 45px rgba(17,24,39,0.18)",
+    boxShadow: "0 20px 45px rgba(22,101,52,0.22)",
     marginBottom: 22,
     overflow: "hidden",
     position: "relative",
+    flexWrap: "wrap",
   },
-
   badge: {
     display: "inline-block",
     background: "rgba(255,255,255,0.14)",
-    border: "1px solid rgba(255,255,255,0.18)",
+    border: "1px solid rgba(255,255,255,0.2)",
     padding: "6px 12px",
     borderRadius: 999,
     fontSize: 12,
@@ -274,32 +279,28 @@ const styles = {
     letterSpacing: 0.8,
     marginBottom: 14,
   },
-
   heroTitle: {
     margin: 0,
-    fontSize: 34,
+    fontSize: "clamp(28px, 4vw, 38px)",
     fontWeight: 900,
     letterSpacing: "-0.8px",
   },
-
   heroText: {
     margin: "10px 0 0",
-    color: "rgba(255,255,255,0.78)",
+    color: "rgba(255,255,255,0.82)",
     maxWidth: 560,
     lineHeight: 1.6,
     fontSize: 15,
   },
-
   heroActions: {
     display: "flex",
     gap: 12,
     marginTop: 22,
     flexWrap: "wrap",
   },
-
   primaryButton: {
     background: COLORS.white,
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     border: "none",
     padding: "12px 20px",
     borderRadius: 12,
@@ -307,17 +308,15 @@ const styles = {
     cursor: "pointer",
     boxShadow: "0 8px 22px rgba(0,0,0,0.16)",
   },
-
   lightButton: {
     background: "rgba(255,255,255,0.12)",
     color: COLORS.white,
-    border: "1px solid rgba(255,255,255,0.2)",
+    border: "1px solid rgba(255,255,255,0.22)",
     padding: "12px 20px",
     borderRadius: 12,
     fontWeight: 800,
     cursor: "pointer",
   },
-
   heroIconBox: {
     width: 130,
     height: 130,
@@ -328,18 +327,15 @@ const styles = {
     justifyContent: "center",
     flexShrink: 0,
   },
-
   heroIcon: {
     fontSize: 64,
   },
-
   statsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 230px), 1fr))",
     gap: 16,
     marginBottom: 22,
   },
-
   statCard: {
     background: COLORS.white,
     borderRadius: 18,
@@ -352,84 +348,81 @@ const styles = {
     cursor: "pointer",
     width: "100%",
     transition: "all 0.2s",
+    textAlign: "left",
   },
-
   statIcon: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    background: "#fff0f1",
+    background: COLORS.primaryLight,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontSize: 24,
     flexShrink: 0,
   },
-
+  statContent: {
+    textAlign: "left",
+    minWidth: 0,
+  },
   statTitle: {
     margin: 0,
     color: COLORS.muted,
     fontSize: 13,
     fontWeight: 700,
   },
-
   statValue: {
     margin: "2px 0",
     fontSize: 24,
     fontWeight: 900,
     color: COLORS.dark,
   },
-
   statText: {
     margin: 0,
     color: COLORS.muted,
     fontSize: 12,
   },
-
   contentGrid: {
     display: "grid",
-    gridTemplateColumns: "1.1fr 0.9fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
     gap: 20,
     marginBottom: 22,
   },
-
   card: {
     background: COLORS.white,
     borderRadius: 20,
-    padding: 22,
+    padding: "clamp(18px, 2.5vw, 22px)",
     border: `1px solid ${COLORS.border}`,
     boxShadow: "0 8px 24px rgba(15,23,42,0.05)",
+    minWidth: 0,
   },
-
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 14,
     marginBottom: 18,
+    flexWrap: "wrap",
   },
-
   cardTitle: {
     margin: 0,
     fontSize: 20,
     color: COLORS.dark,
   },
-
   cardSubtitle: {
     margin: "4px 0 0",
     color: COLORS.muted,
     fontSize: 13,
   },
-
   smallButton: {
-    background: "#fff0f1",
-    color: COLORS.primary,
+    background: COLORS.primaryLight,
+    color: COLORS.primaryDark,
     border: "none",
     padding: "8px 14px",
     borderRadius: 999,
     fontWeight: 800,
     cursor: "pointer",
   },
-
   profileBox: {
     background: "#f9fafb",
     borderRadius: 16,
@@ -438,8 +431,9 @@ const styles = {
     alignItems: "center",
     gap: 14,
     marginBottom: 18,
+    border: `1px solid ${COLORS.softBorder}`,
+    flexWrap: "wrap",
   },
-
   avatar: {
     width: 58,
     height: 58,
@@ -451,65 +445,63 @@ const styles = {
     justifyContent: "center",
     fontSize: 24,
     fontWeight: 900,
+    flexShrink: 0,
   },
-
+  profileInfo: {
+    minWidth: 0,
+  },
   profileName: {
     margin: 0,
     fontSize: 18,
     color: COLORS.dark,
   },
-
   profileEmail: {
     margin: "4px 0 0",
     fontSize: 13,
     color: COLORS.muted,
+    overflowWrap: "anywhere",
   },
-
   infoList: {
     display: "flex",
     flexDirection: "column",
     gap: 12,
   },
-
   infoRow: {
     display: "flex",
     justifyContent: "space-between",
     gap: 16,
     borderBottom: "1px solid #f1f1f1",
     paddingBottom: 10,
+    flexWrap: "wrap",
   },
-
   infoLabel: {
     color: COLORS.muted,
     fontSize: 14,
   },
-
   infoValue: {
     fontWeight: 800,
     fontSize: 14,
     textAlign: "right",
+    overflowWrap: "anywhere",
   },
-
   actionList: {
     display: "flex",
     flexDirection: "column",
     gap: 12,
   },
-
   actionItem: {
     width: "100%",
     border: `1px solid ${COLORS.border}`,
-    background: "#fff",
+    background: COLORS.white,
     borderRadius: 16,
     padding: 14,
     display: "grid",
-    gridTemplateColumns: "44px 1fr 24px",
+    gridTemplateColumns: "44px minmax(0, 1fr) 24px",
     alignItems: "center",
     gap: 12,
     cursor: "pointer",
     transition: "all 0.2s",
   },
-
   actionIcon: {
     width: 44,
     height: 44,
@@ -520,53 +512,51 @@ const styles = {
     justifyContent: "center",
     fontSize: 22,
   },
-
+  actionContent: {
+    textAlign: "left",
+    minWidth: 0,
+  },
   actionTitle: {
     margin: 0,
     fontSize: 15,
     color: COLORS.dark,
   },
-
   actionText: {
     margin: "4px 0 0",
     fontSize: 12,
     color: COLORS.muted,
   },
-
   actionArrow: {
     fontSize: 18,
     color: COLORS.primary,
     fontWeight: 900,
   },
-
   statusCard: {
-    background: "#ecfdf5",
-    border: "1px solid #bbf7d0",
+    background: COLORS.primaryLight,
+    border: `1px solid ${COLORS.border}`,
     borderRadius: 18,
     padding: 18,
     display: "flex",
     gap: 14,
     alignItems: "flex-start",
+    flexWrap: "wrap",
   },
-
   statusIcon: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    background: "#dcfce7",
+    background: "#bbf7d0",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontSize: 22,
     flexShrink: 0,
   },
-
   statusTitle: {
     margin: 0,
-    color: "#166534",
+    color: COLORS.primaryDark,
     fontSize: 17,
   },
-
   statusText: {
     margin: "5px 0 0",
     color: "#15803d",

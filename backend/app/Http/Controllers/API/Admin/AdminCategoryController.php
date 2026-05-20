@@ -9,60 +9,75 @@ use Illuminate\Support\Str;
 
 class AdminCategoryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(Category::latest()->get());
+        $categories = Category::withCount('products')
+            ->when($request->search, function ($query) use ($request) {
+                $query->where('name', 'LIKE', "%{$request->search}%");
+            })
+            ->latest()
+            ->paginate($request->integer('per_page', 15));
+
+        return response()->json($categories);
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255|unique:categories,name',
-            'description' => 'nullable|string',
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', 'unique:categories,name'],
+            'description' => ['nullable', 'string'],
         ]);
 
         $category = Category::create([
-            'name' => $request->name,
-            'slug' => Str::slug($request->name),
-            'description' => $request->description,
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']),
+            'description' => $validated['description'] ?? null,
         ]);
 
         return response()->json([
-            'message' => 'Category created successfully',
+            'message' => 'Category created successfully.',
             'category' => $category,
         ], 201);
     }
 
     public function show(Category $category)
     {
-        return response()->json($category);
+        return response()->json(
+            $category->loadCount('products')
+        );
     }
 
     public function update(Request $request, Category $category)
     {
-        $request->validate([
-            'name' => 'required|string|max:255|unique:categories,name,' . $category->id,
-            'description' => 'nullable|string',
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', 'unique:categories,name,' . $category->id],
+            'description' => ['nullable', 'string'],
         ]);
 
         $category->update([
-            'name' => $request->name,
-            'slug' => Str::slug($request->name),
-            'description' => $request->description,
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']),
+            'description' => $validated['description'] ?? null,
         ]);
 
         return response()->json([
-            'message' => 'Category updated successfully',
-            'category' => $category,
+            'message' => 'Category updated successfully.',
+            'category' => $category->fresh()->loadCount('products'),
         ]);
     }
 
     public function destroy(Category $category)
     {
+        if ($category->products()->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete category with products.',
+            ], 422);
+        }
+
         $category->delete();
 
         return response()->json([
-            'message' => 'Category deleted successfully',
+            'message' => 'Category deleted successfully.',
         ]);
     }
 }

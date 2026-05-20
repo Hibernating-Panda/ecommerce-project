@@ -3,14 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\CartItem;
+use App\Models\Product;
 use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
 
 class CartController extends Controller
 {
     public function index(Request $request)
     {
-        $cartItems = CartItem::with('product.shop')
+        $cartItems = CartItem::with([
+                'product.shop',
+                'product.category',
+            ])
             ->where('user_id', $request->user()->id)
             ->latest()
             ->get();
@@ -22,10 +25,11 @@ class CartController extends Controller
 
     public function store(Request $request)
     {
-        if (!$request->user()->hasRole('user')) {
+        $user = $request->user();
+
+        if (! $user->hasRole('user')) {
             return response()->json([
                 'message' => 'Only customers can add to cart.',
-                'debug_roles' => $request->user()->getRoleNames(),
             ], 403);
         }
 
@@ -34,24 +38,43 @@ class CartController extends Controller
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        $cartItem = CartItem::where('user_id', $request->user()->id)
-            ->where('product_id', $validated['product_id'])
+        $product = Product::where('id', $validated['product_id'])
+            ->where('status', 'active')
             ->first();
 
-        if ($cartItem) {
-            $cartItem->quantity += $validated['quantity'];
-            $cartItem->save();
-        } else {
-            $cartItem = CartItem::create([
-                'user_id' => $request->user()->id,
-                'product_id' => $validated['product_id'],
-                'quantity' => $validated['quantity'],
-            ]);
+        if (! $product) {
+            return response()->json([
+                'message' => 'Product is not available.',
+            ], 422);
         }
+
+        if ($product->stock < $validated['quantity']) {
+            return response()->json([
+                'message' => 'Not enough stock available.',
+            ], 422);
+        }
+
+        $cartItem = CartItem::firstOrNew([
+            'user_id' => $user->id,
+            'product_id' => $validated['product_id'],
+        ]);
+
+        $newQuantity = $cartItem->exists
+            ? $cartItem->quantity + $validated['quantity']
+            : $validated['quantity'];
+
+        if ($product->stock < $newQuantity) {
+            return response()->json([
+                'message' => 'Not enough stock available.',
+            ], 422);
+        }
+
+        $cartItem->quantity = $newQuantity;
+        $cartItem->save();
 
         return response()->json([
             'message' => 'Product added to cart.',
-            'cart_item' => $cartItem,
+            'cart_item' => $cartItem->load('product.shop', 'product.category'),
         ]);
     }
 
@@ -67,13 +90,21 @@ class CartController extends Controller
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
+        $cartItem->load('product');
+
+        if (! $cartItem->product || $cartItem->product->stock < $validated['quantity']) {
+            return response()->json([
+                'message' => 'Not enough stock available.',
+            ], 422);
+        }
+
         $cartItem->update([
             'quantity' => $validated['quantity'],
         ]);
 
         return response()->json([
             'message' => 'Cart quantity updated.',
-            'cart_item' => $cartItem,
+            'cart_item' => $cartItem->load('product.shop', 'product.category'),
         ]);
     }
 

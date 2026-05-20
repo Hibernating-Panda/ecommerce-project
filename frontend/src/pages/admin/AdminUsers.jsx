@@ -1,26 +1,26 @@
 import React, { useEffect, useState } from "react";
 import api from "../../services/api";
+import { roleThemes } from "../../theme/roleThemes";
 
 export default function AdminUsers() {
+  const theme = roleThemes.admin;
+
   const [users, setUsers] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+
+  const [filters, setFilters] = useState({
+    search: "",
+    role: "",
+    account_status: "",
+  });
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const [editingUser, setEditingUser] = useState(null);
   const [deleteModal, setDeleteModal] = useState({
     open: false,
     user: null,
-  });
-
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "user",
-    account_status: "active",
   });
 
   const roleLabels = {
@@ -29,13 +29,25 @@ export default function AdminUsers() {
     delivery_man: "Delivery Man",
   };
 
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
   const fetchUsers = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await api.get("/admin/users");
-      setUsers(response.data);
+      const response = await api.get("/admin/users", {
+        params: {
+          search: filters.search || undefined,
+          role: filters.role || undefined,
+          account_status: filters.account_status || undefined,
+        },
+      });
+
+      setUsers(Array.isArray(response.data) ? response.data : response.data.data || []);
+      setMeta(response.data?.meta || response.data || null);
     } catch (error) {
       console.log(error.response?.data || error);
       setError("Failed to load users.");
@@ -44,95 +56,48 @@ export default function AdminUsers() {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      email: "",
-      password: "",
-      role: "user",
-      account_status: "active",
-    });
-    setEditingUser(null);
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    setFormData((prev) => ({
+  const handleFilterChange = (e) => {
+    setFilters((prev) => ({
       ...prev,
-      [name]: value,
+      [e.target.name]: e.target.value,
     }));
   };
 
-  const createUser = async (e) => {
-    e.preventDefault();
+  const clearFilters = () => {
+    setFilters({
+      search: "",
+      role: "",
+      account_status: "",
+    });
+  };
 
+  const approveUser = async (id) => {
     try {
-      setSaving(true);
       setMessage("");
       setError("");
 
-      await api.post("/admin/users", formData);
+      await api.patch(`/admin/users/${id}/approve`);
 
-      setMessage("User created successfully.");
-      resetForm();
+      setMessage("User approved successfully.");
       fetchUsers();
     } catch (error) {
       console.log(error.response?.data || error);
-      setError(error.response?.data?.message || "Failed to create user.");
-    } finally {
-      setSaving(false);
+      setError(error.response?.data?.message || "Failed to approve user.");
     }
   };
 
-  const startEdit = (user) => {
-    setEditingUser(user);
-
-    setFormData({
-      name: user.name || "",
-      email: user.email || "",
-      password: "",
-      role: user.role || "user",
-      account_status: user.account_status || "active",
-    });
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
-
-  const updateUser = async (e) => {
-    e.preventDefault();
-
-    if (!editingUser) return;
-
+  const rejectUser = async (id) => {
     try {
-      setSaving(true);
       setMessage("");
       setError("");
 
-      const payload = {
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        account_status: formData.account_status,
-      };
+      await api.patch(`/admin/users/${id}/reject`);
 
-      if (formData.password.trim() !== "") {
-        payload.password = formData.password;
-      }
-
-      await api.put(`/admin/users/${editingUser.id}`, payload);
-
-      setMessage("User updated successfully.");
-      resetForm();
+      setMessage("User rejected successfully.");
       fetchUsers();
     } catch (error) {
       console.log(error.response?.data || error);
-      setError(error.response?.data?.message || "Failed to update user.");
-    } finally {
-      setSaving(false);
+      setError(error.response?.data?.message || "Failed to reject user.");
     }
   };
 
@@ -168,51 +133,18 @@ export default function AdminUsers() {
     }
   };
 
-  const approveUser = async (id) => {
-    try {
-      setMessage("");
-      setError("");
-
-      await api.patch(`/admin/users/${id}/approve`);
-
-      setMessage("User approved successfully.");
-      fetchUsers();
-    } catch (error) {
-      console.log(error.response?.data || error);
-      setError(error.response?.data?.message || "Failed to approve user.");
-    }
-  };
-
-  const rejectUser = async (id) => {
-    try {
-      setMessage("");
-      setError("");
-
-      await api.patch(`/admin/users/${id}/reject`);
-
-      setMessage("User rejected successfully.");
-      fetchUsers();
-    } catch (error) {
-      console.log(error.response?.data || error);
-      setError(error.response?.data?.message || "Failed to reject user.");
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   return (
     <div style={styles.page}>
       <div style={styles.header}>
         <div>
-          <h1 style={styles.title}>Manage Users</h1>
+          <p style={{ ...styles.kicker, color: theme.primary }}>Admin</p>
+          <h1 style={styles.title}>Users</h1>
           <p style={styles.subtitle}>
-            Create, edit, and manage customers, shop owners, and delivery men.
+            Search, filter, approve, reject, and remove users.
           </p>
         </div>
 
-        <button onClick={fetchUsers} style={styles.refreshButton}>
+        <button onClick={fetchUsers} style={{ ...styles.refreshButton, backgroundColor: theme.primary }}>
           Refresh
         </button>
       </div>
@@ -220,111 +152,54 @@ export default function AdminUsers() {
       {message && <div style={styles.successBox}>{message}</div>}
       {error && <div style={styles.errorBox}>{error}</div>}
 
-      <div style={styles.formCard}>
-        <div style={styles.formHeader}>
-          <h2 style={styles.formTitle}>
-            {editingUser ? "Edit User" : "Create New User"}
-          </h2>
+      <div style={styles.filterCard}>
+        <input
+          type="text"
+          name="search"
+          value={filters.search}
+          onChange={handleFilterChange}
+          placeholder="Search name, email, or phone..."
+          style={styles.input}
+        />
 
-          {editingUser && (
-            <button onClick={resetForm} style={styles.cancelButton}>
-              Cancel Edit
-            </button>
-          )}
-        </div>
+        <select name="role" value={filters.role} onChange={handleFilterChange} style={styles.input}>
+          <option value="">All Roles</option>
+          <option value="user">Customer</option>
+          <option value="shop_owner">Shop Owner</option>
+          <option value="delivery_man">Delivery Man</option>
+        </select>
 
-        <form onSubmit={editingUser ? updateUser : createUser}>
-          <div style={styles.formGrid}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Name</label>
-              <input
-                type="text"
-                name="name"
-                placeholder="Enter full name"
-                value={formData.name}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              />
-            </div>
+        <select
+          name="account_status"
+          value={filters.account_status}
+          onChange={handleFilterChange}
+          style={styles.input}
+        >
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending</option>
+          <option value="rejected">Rejected</option>
+        </select>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Email</label>
-              <input
-                type="email"
-                name="email"
-                placeholder="Enter email address"
-                value={formData.email}
-                onChange={handleChange}
-                style={styles.input}
-                required
-              />
-            </div>
+        <button onClick={fetchUsers} style={{ ...styles.searchButton, backgroundColor: theme.primary }}>
+          Search
+        </button>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>
-                Password {editingUser && <span style={styles.hint}>(blank to keep current)</span>}
-              </label>
-              <input
-                type="password"
-                name="password"
-                placeholder={editingUser ? "New password optional" : "Enter password"}
-                value={formData.password}
-                onChange={handleChange}
-                style={styles.input}
-                required={!editingUser}
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Role</label>
-              <select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                style={styles.input}
-              >
-                <option value="user">Customer</option>
-                <option value="shop_owner">Shop Owner</option>
-                <option value="delivery_man">Delivery Man</option>
-              </select>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Account Status</label>
-              <select
-                name="account_status"
-                value={formData.account_status}
-                onChange={handleChange}
-                style={styles.input}
-              >
-                <option value="active">Active</option>
-                <option value="pending">Pending</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
-          </div>
-
-          <button type="submit" disabled={saving} style={styles.submitButton}>
-            {saving
-              ? "Saving..."
-              : editingUser
-              ? "Update User"
-              : "Create User"}
-          </button>
-        </form>
+        <button onClick={clearFilters} style={styles.clearButton}>
+          Clear
+        </button>
       </div>
 
       <div style={styles.tableCard}>
         <div style={styles.tableHeader}>
           <div>
             <h2 style={styles.tableTitle}>User List</h2>
-            <p style={styles.tableSubtitle}>
-              Admin accounts are hidden for safety.
-            </p>
+            <p style={styles.tableSubtitle}>Admin accounts are hidden for safety.</p>
           </div>
 
-          <span style={styles.countBadge}>{users.length} users</span>
+          <span style={{ ...styles.countBadge, backgroundColor: theme.primaryLight, color: theme.primaryDark }}>
+            {meta?.total || users.length} users
+          </span>
         </div>
 
         {loading ? (
@@ -339,21 +214,22 @@ export default function AdminUsers() {
                   <th style={styles.th}>ID</th>
                   <th style={styles.th}>Name</th>
                   <th style={styles.th}>Email</th>
+                  <th style={styles.th}>Phone</th>
                   <th style={styles.th}>Role</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Created</th>
-                  <th style={styles.th}>Action</th>
+                  <th style={styles.th}>Actions</th>
                 </tr>
               </thead>
 
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.id} style={styles.tr}>
+                  <tr key={user.id}>
                     <td style={styles.td}>#{user.id}</td>
 
                     <td style={styles.td}>
                       <div style={styles.userCell}>
-                        <div style={styles.avatar}>
+                        <div style={{ ...styles.avatar, backgroundColor: theme.primary }}>
                           {user.name?.charAt(0).toUpperCase()}
                         </div>
                         <strong>{user.name}</strong>
@@ -361,6 +237,7 @@ export default function AdminUsers() {
                     </td>
 
                     <td style={styles.td}>{user.email}</td>
+                    <td style={styles.td}>{user.phone || "N/A"}</td>
 
                     <td style={styles.td}>
                       <span style={getRoleBadgeStyle(user.role)}>
@@ -375,42 +252,26 @@ export default function AdminUsers() {
                     </td>
 
                     <td style={styles.td}>
-                      {new Date(user.created_at).toLocaleDateString()}
+                      {user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A"}
                     </td>
 
                     <td style={styles.td}>
                       <div style={styles.actionGroup}>
-                        <button
-                          onClick={() => startEdit(user)}
-                          style={styles.editButton}
-                        >
-                          Edit
-                        </button>
+                        {user.account_status === "pending" && (
+                          <>
+                            <button onClick={() => approveUser(user.id)} style={styles.approveButton}>
+                              Approve
+                            </button>
 
-                        <button
-                          onClick={() => openDeleteModal(user)}
-                          style={styles.deleteButton}
-                        >
+                            <button onClick={() => rejectUser(user.id)} style={styles.rejectButton}>
+                              Reject
+                            </button>
+                          </>
+                        )}
+
+                        <button onClick={() => openDeleteModal(user)} style={styles.deleteButton}>
                           Delete
                         </button>
-
-                        {user.account_status === "pending" && (
-                        <>
-                          <button
-                            onClick={() => approveUser(user.id)}
-                            style={styles.approveButton}
-                          >
-                            Approve
-                          </button>
-
-                          <button
-                            onClick={() => rejectUser(user.id)}
-                            style={styles.rejectButton}
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
                       </div>
                     </td>
                   </tr>
@@ -425,17 +286,11 @@ export default function AdminUsers() {
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
             <div style={styles.modalIcon}>⚠️</div>
-
             <h2 style={styles.modalTitle}>Delete User?</h2>
-
             <p style={styles.modalText}>
-              Are you sure you want to delete{" "}
-              <strong>{deleteModal.user?.name}</strong>?
+              Are you sure you want to delete <strong>{deleteModal.user?.name}</strong>?
             </p>
-
-            <p style={styles.modalWarning}>
-              This action cannot be undone.
-            </p>
+            <p style={styles.modalWarning}>This action cannot be undone.</p>
 
             <div style={styles.modalActions}>
               <button onClick={closeDeleteModal} style={styles.modalCancelButton}>
@@ -459,30 +314,14 @@ const getRoleBadgeStyle = (role) => {
     padding: "6px 10px",
     borderRadius: "999px",
     fontSize: "12px",
-    fontWeight: "700",
+    fontWeight: "800",
+    whiteSpace: "nowrap",
   };
 
-  if (role === "shop_owner") {
-    return {
-      ...base,
-      backgroundColor: "#fef3c7",
-      color: "#92400e",
-    };
-  }
+  if (role === "shop_owner") return { ...base, backgroundColor: "#dbeafe", color: "#1e40af" };
+  if (role === "delivery_man") return { ...base, backgroundColor: "#fef3c7", color: "#92400e" };
 
-  if (role === "delivery_man") {
-    return {
-      ...base,
-      backgroundColor: "#dbeafe",
-      color: "#1e40af",
-    };
-  }
-
-  return {
-    ...base,
-    backgroundColor: "#dcfce7",
-    color: "#166534",
-  };
+  return { ...base, backgroundColor: "#dcfce7", color: "#166534" };
 };
 
 const getStatusBadgeStyle = (status) => {
@@ -491,70 +330,55 @@ const getStatusBadgeStyle = (status) => {
     padding: "6px 10px",
     borderRadius: "999px",
     fontSize: "12px",
-    fontWeight: "700",
+    fontWeight: "800",
     textTransform: "capitalize",
+    whiteSpace: "nowrap",
   };
 
-  if (status === "pending") {
-    return {
-      ...base,
-      backgroundColor: "#fef3c7",
-      color: "#92400e",
-    };
-  }
+  if (status === "pending") return { ...base, backgroundColor: "#fef3c7", color: "#92400e" };
+  if (status === "rejected") return { ...base, backgroundColor: "#fee2e2", color: "#991b1b" };
 
-  if (status === "rejected") {
-    return {
-      ...base,
-      backgroundColor: "#fee2e2",
-      color: "#991b1b",
-    };
-  }
-
-  return {
-    ...base,
-    backgroundColor: "#dcfce7",
-    color: "#166534",
-  };
+  return { ...base, backgroundColor: "#dcfce7", color: "#166534" };
 };
 
 const styles = {
   page: {
-    padding: "24px",
-    backgroundColor: "#f5f7fb",
+    padding: "clamp(16px, 2.5vw, 28px)",
     minHeight: "100vh",
+    boxSizing: "border-box",
   },
-
   header: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: "20px",
     gap: "12px",
     flexWrap: "wrap",
   },
-
+  kicker: {
+    margin: "0 0 6px",
+    fontSize: "13px",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+  },
   title: {
     margin: 0,
-    fontSize: "30px",
+    fontSize: "clamp(28px, 4vw, 38px)",
     color: "#111827",
   },
-
   subtitle: {
-    margin: "8px 0 0 0",
+    margin: "8px 0 0",
     color: "#6b7280",
   },
-
   refreshButton: {
     padding: "10px 16px",
     border: "none",
     borderRadius: "10px",
-    backgroundColor: "#111827",
     color: "#ffffff",
     cursor: "pointer",
-    fontWeight: "700",
+    fontWeight: "800",
   },
-
   successBox: {
     backgroundColor: "#dcfce7",
     color: "#166534",
@@ -563,7 +387,6 @@ const styles = {
     borderRadius: "12px",
     marginBottom: "16px",
   },
-
   errorBox: {
     backgroundColor: "#fee2e2",
     color: "#991b1b",
@@ -572,91 +395,51 @@ const styles = {
     borderRadius: "12px",
     marginBottom: "16px",
   },
-
-  formCard: {
+  filterCard: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "12px",
     backgroundColor: "#ffffff",
     borderRadius: "16px",
-    padding: "22px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+    padding: "18px",
+    boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
     border: "1px solid #eef1f6",
-    marginBottom: "24px",
+    marginBottom: "20px",
   },
-
-  formHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "18px",
-    gap: "12px",
-    flexWrap: "wrap",
-  },
-
-  formTitle: {
-    margin: 0,
-    fontSize: "20px",
-    color: "#111827",
-  },
-
-  cancelButton: {
-    padding: "9px 14px",
-    borderRadius: "10px",
-    border: "1px solid #d1d5db",
-    backgroundColor: "#ffffff",
-    cursor: "pointer",
-    fontWeight: "700",
-  },
-
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: "16px",
-    marginBottom: "18px",
-  },
-
-  formGroup: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "7px",
-  },
-
-  label: {
-    fontSize: "14px",
-    fontWeight: "700",
-    color: "#374151",
-  },
-
-  hint: {
-    fontSize: "12px",
-    color: "#6b7280",
-    fontWeight: "500",
-  },
-
   input: {
     padding: "11px 12px",
     borderRadius: "10px",
     border: "1px solid #d1d5db",
     outline: "none",
     fontSize: "14px",
+    width: "100%",
+    boxSizing: "border-box",
+    backgroundColor: "white",
   },
-
-  submitButton: {
-    padding: "11px 18px",
+  searchButton: {
+    padding: "11px 16px",
     borderRadius: "10px",
     border: "none",
-    backgroundColor: "#4f46e5",
-    color: "#ffffff",
-    cursor: "pointer",
+    color: "white",
     fontWeight: "800",
+    cursor: "pointer",
   },
-
+  clearButton: {
+    padding: "11px 16px",
+    borderRadius: "10px",
+    border: "1px solid #d1d5db",
+    backgroundColor: "white",
+    color: "#374151",
+    fontWeight: "800",
+    cursor: "pointer",
+  },
   tableCard: {
     backgroundColor: "#ffffff",
     borderRadius: "16px",
     padding: "22px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
     border: "1px solid #eef1f6",
   },
-
   tableHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -665,34 +448,27 @@ const styles = {
     gap: "12px",
     flexWrap: "wrap",
   },
-
   tableTitle: {
     margin: 0,
     fontSize: "20px",
     color: "#111827",
   },
-
   tableSubtitle: {
-    margin: "6px 0 0 0",
+    margin: "6px 0 0",
     color: "#6b7280",
     fontSize: "14px",
   },
-
   countBadge: {
-    backgroundColor: "#eef2ff",
-    color: "#4338ca",
     padding: "8px 12px",
     borderRadius: "999px",
     fontSize: "13px",
     fontWeight: "800",
   },
-
   loadingBox: {
     padding: "30px",
     textAlign: "center",
     color: "#6b7280",
   },
-
   emptyBox: {
     padding: "30px",
     textAlign: "center",
@@ -700,16 +476,14 @@ const styles = {
     backgroundColor: "#f9fafb",
     borderRadius: "12px",
   },
-
   tableWrapper: {
     overflowX: "auto",
   },
-
   table: {
     width: "100%",
+    minWidth: "900px",
     borderCollapse: "collapse",
   },
-
   th: {
     textAlign: "left",
     padding: "14px",
@@ -717,53 +491,36 @@ const styles = {
     color: "#374151",
     fontSize: "13px",
     borderBottom: "1px solid #e5e7eb",
+    whiteSpace: "nowrap",
   },
-
-  tr: {
-    borderBottom: "1px solid #e5e7eb",
-  },
-
   td: {
     padding: "14px",
     color: "#374151",
     fontSize: "14px",
+    borderBottom: "1px solid #e5e7eb",
     verticalAlign: "middle",
   },
-
   userCell: {
     display: "flex",
     alignItems: "center",
     gap: "10px",
   },
-
   avatar: {
     width: "34px",
     height: "34px",
     borderRadius: "50%",
-    backgroundColor: "#4f46e5",
     color: "#ffffff",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontWeight: "800",
+    flexShrink: 0,
   },
-
   actionGroup: {
     display: "flex",
     gap: "8px",
     flexWrap: "wrap",
   },
-
-  editButton: {
-    padding: "8px 12px",
-    borderRadius: "8px",
-    border: "none",
-    backgroundColor: "#2563eb",
-    color: "#ffffff",
-    cursor: "pointer",
-    fontWeight: "700",
-  },
-
   deleteButton: {
     padding: "8px 12px",
     borderRadius: "8px",
@@ -771,15 +528,29 @@ const styles = {
     backgroundColor: "#dc2626",
     color: "#ffffff",
     cursor: "pointer",
-    fontWeight: "700",
+    fontWeight: "800",
   },
-
+  approveButton: {
+    padding: "8px 12px",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#16a34a",
+    color: "#ffffff",
+    cursor: "pointer",
+    fontWeight: "800",
+  },
+  rejectButton: {
+    padding: "8px 12px",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#f97316",
+    color: "#ffffff",
+    cursor: "pointer",
+    fontWeight: "800",
+  },
   modalOverlay: {
     position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    inset: 0,
     backgroundColor: "rgba(0, 0, 0, 0.55)",
     display: "flex",
     justifyContent: "center",
@@ -787,7 +558,6 @@ const styles = {
     zIndex: 3000,
     padding: "20px",
   },
-
   modalCard: {
     width: "100%",
     maxWidth: "420px",
@@ -797,7 +567,6 @@ const styles = {
     textAlign: "center",
     boxShadow: "0 20px 45px rgba(0,0,0,0.25)",
   },
-
   modalIcon: {
     width: "64px",
     height: "64px",
@@ -808,35 +577,31 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     fontSize: "30px",
-    margin: "0 auto 16px auto",
+    margin: "0 auto 16px",
   },
-
   modalTitle: {
-    margin: "0 0 10px 0",
+    margin: "0 0 10px",
     color: "#111827",
     fontSize: "24px",
   },
-
   modalText: {
-    margin: "0 0 8px 0",
+    margin: "0 0 8px",
     color: "#374151",
     fontSize: "15px",
     lineHeight: "1.6",
   },
-
   modalWarning: {
-    margin: "0 0 22px 0",
+    margin: "0 0 22px",
     color: "#991b1b",
     fontSize: "14px",
-    fontWeight: "700",
+    fontWeight: "800",
   },
-
   modalActions: {
     display: "flex",
     justifyContent: "center",
     gap: "12px",
+    flexWrap: "wrap",
   },
-
   modalCancelButton: {
     padding: "10px 18px",
     borderRadius: "10px",
@@ -846,7 +611,6 @@ const styles = {
     cursor: "pointer",
     fontWeight: "800",
   },
-
   modalDeleteButton: {
     padding: "10px 18px",
     borderRadius: "10px",
@@ -855,25 +619,5 @@ const styles = {
     color: "#ffffff",
     cursor: "pointer",
     fontWeight: "800",
-  },
-
-  approveButton: {
-    padding: "8px 12px",
-    borderRadius: "8px",
-    border: "none",
-    backgroundColor: "#16a34a",
-    color: "#ffffff",
-    cursor: "pointer",
-    fontWeight: "700",
-  },
-
-  rejectButton: {
-    padding: "8px 12px",
-    borderRadius: "8px",
-    border: "none",
-    backgroundColor: "#f97316",
-    color: "#ffffff",
-    cursor: "pointer",
-    fontWeight: "700",
   },
 };

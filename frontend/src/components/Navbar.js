@@ -2,6 +2,17 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+const COLORS = {
+  customer: "#16a34a",
+  customerDark: "#166534",
+  customerLight: "#dcfce7",
+  border: "#bbf7d0",
+  dark: "#111827",
+  muted: "#6b7280",
+  white: "#ffffff",
+  danger: "#dc2626",
+};
+
 const Navbar = () => {
   const { user, login, register, logout } = useAuth();
   const navigate = useNavigate();
@@ -49,17 +60,17 @@ const Navbar = () => {
 
   const redirectByRole = (role) => {
     if (role === "admin") {
-      navigate("/admin");
+      navigate("/admin/dashboard");
       return;
     }
 
     if (role === "shop_owner") {
-      navigate("/shop");
+      navigate("/shopowner/dashboard");
       return;
     }
 
     if (role === "delivery_man") {
-      navigate("/delivery");
+      navigate("/delivery/dashboard");
       return;
     }
 
@@ -104,7 +115,6 @@ const Navbar = () => {
     e.preventDefault();
 
     const keyword = search.trim();
-
     if (!keyword) return;
 
     navigate(`/search?keyword=${encodeURIComponent(keyword)}`);
@@ -121,11 +131,11 @@ const Navbar = () => {
     }
 
     if (user.role === "admin") {
-      navigate("/admin");
+      navigate("/admin/dashboard");
     } else if (user.role === "shop_owner") {
-      navigate("/shop");
+      navigate("/shopowner/dashboard");
     } else if (user.role === "delivery_man") {
-      navigate("/delivery");
+      navigate("/delivery/dashboard");
     } else {
       navigate("/customer/dashboard");
     }
@@ -342,7 +352,7 @@ const Navbar = () => {
         .slice(0, 2)
     : "?";
 
-  const isCustomer = user?.role === "user";
+  const isCustomer = user?.role === "user" || user?.role === "customer";
 
   const customerMenu = [
     {
@@ -425,18 +435,18 @@ const Navbar = () => {
                 Login
               </button>
 
-              <button onClick={openRegister} style={styles.redButton}>
+              <button onClick={openRegister} style={styles.greenButton}>
                 Sign Up
               </button>
             </>
           ) : (
             <div ref={dropdownRef} style={{ position: "relative" }}>
               <div
-                onClick={() => setDropdownOpen((o) => !o)}
+                onClick={() => setDropdownOpen((open) => !open)}
                 style={{
                   ...styles.avatar,
                   border: dropdownOpen
-                    ? "2px solid #b0001f"
+                    ? `2px solid ${COLORS.customerDark}`
                     : "2px solid transparent",
                 }}
               >
@@ -449,7 +459,7 @@ const Navbar = () => {
                     <div style={styles.userName}>{user?.name}</div>
                     <div style={styles.userEmail}>{user?.email}</div>
                     <div style={styles.userRole}>
-                      {user?.role === "user"
+                      {user?.role === "user" || user?.role === "customer"
                         ? "Customer"
                         : user?.role === "shop_owner"
                         ? "Shop Owner"
@@ -498,7 +508,9 @@ const Navbar = () => {
 
             {loginMessage && <div style={styles.noticeBox}>{loginMessage}</div>}
 
-            {errors.general && <div style={styles.errorBox}>{errors.general}</div>}
+            {errors.general && (
+              <div style={styles.errorBox}>{errors.general}</div>
+            )}
 
             {authPopup === "login" ? (
               <form onSubmit={handleLoginSubmit}>
@@ -512,7 +524,7 @@ const Navbar = () => {
                   style={{
                     ...styles.input,
                     border: getError("email")
-                      ? "1px solid #dc2626"
+                      ? `1px solid ${COLORS.danger}`
                       : "1px solid #ddd",
                   }}
                   required
@@ -531,7 +543,7 @@ const Navbar = () => {
                   style={{
                     ...styles.input,
                     border: getError("password")
-                      ? "1px solid #dc2626"
+                      ? `1px solid ${COLORS.danger}`
                       : "1px solid #ddd",
                   }}
                   required
@@ -540,7 +552,11 @@ const Navbar = () => {
                   <p style={styles.fieldError}>{getError("password")}</p>
                 )}
 
-                <button type="submit" disabled={loading} style={styles.submitButton}>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={styles.submitButton}
+                >
                   {loading ? "Logging in..." : "Login"}
                 </button>
 
@@ -563,7 +579,7 @@ const Navbar = () => {
                   style={{
                     ...styles.input,
                     border: getError("name")
-                      ? "1px solid #dc2626"
+                      ? `1px solid ${COLORS.danger}`
                       : "1px solid #ddd",
                   }}
                   required
@@ -582,7 +598,7 @@ const Navbar = () => {
                   style={{
                     ...styles.input,
                     border: getError("email")
-                      ? "1px solid #dc2626"
+                      ? `1px solid ${COLORS.danger}`
                       : "1px solid #ddd",
                   }}
                   required
@@ -599,7 +615,7 @@ const Navbar = () => {
                   style={{
                     ...styles.input,
                     border: getError("role")
-                      ? "1px solid #dc2626"
+                      ? `1px solid ${COLORS.danger}`
                       : "1px solid #ddd",
                   }}
                   required
@@ -632,7 +648,7 @@ const Navbar = () => {
                   style={{
                     ...styles.input,
                     border: getError("password")
-                      ? "1px solid #dc2626"
+                      ? `1px solid ${COLORS.danger}`
                       : "1px solid #ddd",
                   }}
                   required
@@ -651,7 +667,7 @@ const Navbar = () => {
                   style={{
                     ...styles.input,
                     border: getError("password_confirmation")
-                      ? "1px solid #dc2626"
+                      ? `1px solid ${COLORS.danger}`
                       : "1px solid #ddd",
                   }}
                   required
@@ -662,7 +678,11 @@ const Navbar = () => {
                   </p>
                 )}
 
-                <button type="submit" disabled={loading} style={styles.submitButton}>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={styles.submitButton}
+                >
                   {loading ? "Registering..." : "Register"}
                 </button>
 
@@ -686,14 +706,15 @@ const styles = {
     position: "sticky",
     top: 0,
     zIndex: 100,
-    backgroundColor: "#fff",
-    borderBottom: "2px solid #E8192C",
-    padding: "0 24px",
-    height: 60,
+    backgroundColor: COLORS.white,
+    borderBottom: `2px solid ${COLORS.customer}`,
+    padding: "0 clamp(12px, 3vw, 24px)",
+    minHeight: 60,
     display: "flex",
     alignItems: "center",
     gap: 16,
     boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    flexWrap: "wrap",
   },
 
   logoBox: {
@@ -703,9 +724,9 @@ const styles = {
   },
 
   logo: {
-    fontSize: 26,
+    fontSize: "clamp(22px, 4vw, 26px)",
     fontWeight: 900,
-    color: "#E8192C",
+    color: COLORS.customer,
     letterSpacing: -1,
     fontFamily: "Georgia, serif",
   },
@@ -739,7 +760,8 @@ const styles = {
 
   searchButton: {
     padding: "0 14px",
-    background: "#e0e0e0",
+    background: COLORS.customerLight,
+    color: COLORS.customerDark,
     border: "none",
     cursor: "pointer",
     display: "flex",
@@ -752,6 +774,7 @@ const styles = {
     alignItems: "center",
     gap: 12,
     flexShrink: 0,
+    marginLeft: "auto",
   },
 
   iconButton: {
@@ -766,8 +789,8 @@ const styles = {
     width: 34,
     height: 34,
     borderRadius: "50%",
-    background: "#E8192C",
-    color: "#fff",
+    background: COLORS.customer,
+    color: COLORS.white,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -778,7 +801,7 @@ const styles = {
   },
 
   outlineButton: {
-    background: "#fff",
+    background: COLORS.white,
     border: "1px solid #ddd",
     color: "#333",
     padding: "8px 15px",
@@ -788,10 +811,10 @@ const styles = {
     fontSize: 13,
   },
 
-  redButton: {
-    background: "#E8192C",
+  greenButton: {
+    background: COLORS.customer,
     border: "none",
-    color: "#fff",
+    color: COLORS.white,
     padding: "8px 15px",
     borderRadius: 6,
     cursor: "pointer",
@@ -803,7 +826,7 @@ const styles = {
     position: "absolute",
     right: 0,
     top: 42,
-    background: "#fff",
+    background: COLORS.white,
     border: "1px solid #eee",
     borderRadius: 8,
     boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
@@ -827,13 +850,14 @@ const styles = {
     fontSize: 11,
     color: "#888",
     marginTop: 2,
+    overflowWrap: "anywhere",
   },
 
   userRole: {
     display: "inline-block",
     marginTop: 7,
-    background: "#FFF0F1",
-    color: "#E8192C",
+    background: COLORS.customerLight,
+    color: COLORS.customerDark,
     padding: "3px 8px",
     borderRadius: 999,
     fontSize: 10,
@@ -853,7 +877,7 @@ const styles = {
   logoutItem: {
     padding: "10px 16px",
     fontSize: 13,
-    color: "#E8192C",
+    color: COLORS.danger,
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
@@ -877,7 +901,7 @@ const styles = {
     maxWidth: 430,
     maxHeight: "90vh",
     overflowY: "auto",
-    background: "#fff",
+    background: COLORS.white,
     borderRadius: 12,
     padding: 24,
     boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
@@ -899,8 +923,8 @@ const styles = {
   },
 
   noticeBox: {
-    background: "#FFF0F1",
-    color: "#E8192C",
+    background: COLORS.customerLight,
+    color: COLORS.customerDark,
     padding: "10px 12px",
     borderRadius: 6,
     fontSize: 13,
@@ -935,11 +959,11 @@ const styles = {
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box",
-    background: "#fff",
+    background: COLORS.white,
   },
 
   fieldError: {
-    color: "#dc2626",
+    color: COLORS.danger,
     fontSize: 12,
     marginTop: -6,
     marginBottom: 10,
@@ -947,14 +971,14 @@ const styles = {
 
   roleHint: {
     margin: "-4px 0 10px 0",
-    color: "#6b7280",
+    color: COLORS.muted,
     fontSize: 12,
   },
 
   submitButton: {
     width: "100%",
-    background: "#E8192C",
-    color: "#fff",
+    background: COLORS.customer,
+    color: COLORS.white,
     border: "none",
     padding: "11px 12px",
     borderRadius: 6,
@@ -973,7 +997,7 @@ const styles = {
   },
 
   switchLink: {
-    color: "#E8192C",
+    color: COLORS.customer,
     fontWeight: 700,
     cursor: "pointer",
   },

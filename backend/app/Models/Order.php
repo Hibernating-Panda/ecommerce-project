@@ -7,56 +7,40 @@ use Illuminate\Database\Eloquent\Model;
 class Order extends Model
 {
     protected $fillable = [
-        'shop_id',
         'customer_id',
-
         'customer_name',
-        'product_name',
-        'quantity',
+        'delivery_address',
+        'payment_method',
+        'order_type',
+        'pickup_date',
+        'status',
         'total',
         'order_date',
-
-        'pickup_address',
-        'delivery_address',
-        'pickup_lat',
-        'pickup_lng',
-        'delivery_lat',
-        'delivery_lng',
-
-        'status',
-        'price',
-        'assigned_delivery_man',
-        'notes',
-        'weight',
     ];
 
-    public function shop()
-    {
-        return $this->belongsTo(Shop::class);
-    }
+    protected $casts = [
+        'total' => 'decimal:2',
+        'order_date' => 'datetime',
+        'pickup_date' => 'datetime',
+    ];
 
     public function customer()
     {
         return $this->belongsTo(User::class, 'customer_id');
     }
 
-    public function deliveryMan()
+    public function items()
     {
-        return $this->belongsTo(User::class, 'assigned_delivery_man');
+        return $this->hasMany(OrderItem::class);
     }
 
-    public function delivery()
+    public function deliveries()
     {
-        return $this->hasOne(Delivery::class);
+        return $this->hasMany(Delivery::class);
     }
 
     public function payment()
     {
         return $this->hasOne(Payment::class);
-    }
-
-    public function trackings()
-    {
-        return $this->hasMany(Tracking::class);
     }
 }

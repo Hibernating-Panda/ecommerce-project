@@ -13,7 +13,26 @@ class Shop extends Model
         'phone',
         'address',
         'description',
+        'aba_qr_image',
+        'aba_account_name',
+        'aba_account_number',
     ];
+
+    protected $appends = [
+        'aba_qr_url',
+    ];
+
+    public function getAbaQrUrlAttribute()
+    {
+        return $this->aba_qr_image
+            ? asset('storage/' . $this->aba_qr_image)
+            : null;
+    }
+
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 
     public function products()
     {

@@ -8,47 +8,29 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\ShopReviewController;
-use App\Http\Controllers\OrderController;
 
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\HomeController;
 use App\Http\Controllers\API\ShopController;
 use App\Http\Controllers\API\ShopOwnerController;
-
+use App\Http\Controllers\API\OrderController as CartOrderController;
 use App\Http\Controllers\API\DashboardController;
-use App\Http\Controllers\API\DeliveryController;
+use App\Http\Controllers\API\DeliveryMan\DeliveryController;
 use App\Http\Controllers\API\InvoiceController;
 use App\Http\Controllers\API\PaymentController;
 use App\Http\Controllers\API\RolePermissionController;
 use App\Http\Controllers\API\RouteOptimizationController;
-use App\Http\Controllers\API\TrackingController;
-use App\Http\Controllers\API\UserController;
-
-// Comment this for now until ActivityLogController namespace is confirmed
-// use App\Http\Controllers\ActivityLogController;
-// use App\Http\Controllers\API\ActivityLogController;
+use App\Http\Controllers\API\ProfileController;
 
 use App\Http\Controllers\API\Admin\AdminDashboardController;
 use App\Http\Controllers\API\Admin\AdminUserController;
 use App\Http\Controllers\API\Admin\AdminProductController;
 use App\Http\Controllers\API\Admin\AdminCategoryController;
 use App\Http\Controllers\API\Admin\AdminProfileController;
-
-
-/*
-|--------------------------------------------------------------------------
-| Auth Routes
-|--------------------------------------------------------------------------
-*/
+use App\Http\Controllers\API\Admin\AdminDeliveryController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
-
-/*
-|--------------------------------------------------------------------------
-| Public Routes
-|--------------------------------------------------------------------------
-*/
 
 Route::get('/', [HomeController::class, 'index']);
 Route::get('/homepage-products', [HomeController::class, 'index']);
@@ -62,44 +44,32 @@ Route::get('/categories/{id}', [CategoryController::class, 'show']);
 Route::get('/shops', [ShopController::class, 'index']);
 Route::get('/shops/{id}', [ShopController::class, 'show']);
 
-/*
-|--------------------------------------------------------------------------
-| Stripe Webhook
-|--------------------------------------------------------------------------
-*/
-
-Route::post('/payments/stripe/webhook', [PaymentController::class, 'stripeWebhook']);
-
-/*
-|--------------------------------------------------------------------------
-| Authenticated User Routes
-|--------------------------------------------------------------------------
-*/
-
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
+    Route::get('/me', [AuthController::class, 'user']);
+
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::put('/profile', [ProfileController::class, 'update']);
 
     Route::get('/cart', [CartController::class, 'index']);
     Route::post('/cart', [CartController::class, 'store']);
     Route::put('/cart/{cartItem}', [CartController::class, 'update']);
     Route::delete('/cart/{cartItem}', [CartController::class, 'destroy']);
 
+    Route::get('/customer/orders', [CartOrderController::class, 'customerIndex']);
+    Route::post('/orders', [CartOrderController::class, 'store']);
+    Route::put('/orders/{order}/cancel', [CartOrderController::class, 'cancel']);
+    Route::put('/orders/{order}/checkout', [CartOrderController::class, 'checkout']);
+
     Route::get('/wishlist', [WishlistController::class, 'index']);
     Route::post('/wishlist/toggle', [WishlistController::class, 'toggle']);
 
     Route::post('/product-reviews', [ProductReviewController::class, 'store']);
     Route::post('/shop-reviews', [ShopReviewController::class, 'store']);
-
     Route::get('/my-product-reviews', [ProductReviewController::class, 'myReviews']);
     Route::get('/my-shop-reviews', [ShopReviewController::class, 'myReviews']);
 });
-
-/*
-|--------------------------------------------------------------------------
-| Shop Owner Routes
-|--------------------------------------------------------------------------
-*/
 
 Route::middleware('auth:sanctum')
     ->prefix('shopowner')
@@ -113,20 +83,15 @@ Route::middleware('auth:sanctum')
         Route::put('/products/{id}', [ShopOwnerController::class, 'updateProduct']);
         Route::delete('/products/{id}', [ShopOwnerController::class, 'deleteProduct']);
 
-        Route::get('/orders', [ShopOwnerController::class, 'orders']);
-        Route::put('/orders/{id}/status', [ShopOwnerController::class, 'updateOrderStatus']);
+        Route::get('/orders', [CartOrderController::class, 'shopOwnerOrders']);
+        Route::put('/order-items/{orderItem}/reject', [CartOrderController::class, 'rejectItem']);
+        Route::put('/order-items/{orderItem}/ready', [CartOrderController::class, 'readyItem']);
 
         Route::get('/sales', [ShopOwnerController::class, 'sales']);
 
         Route::get('/profile', [ShopOwnerController::class, 'profile']);
-        Route::put('/profile', [ShopOwnerController::class, 'updateProfile']);
+        Route::post('/profile', [ShopOwnerController::class, 'updateProfile']);
     });
-
-/*
-|--------------------------------------------------------------------------
-| Admin Routes
-|--------------------------------------------------------------------------
-*/
 
 Route::middleware(['auth:sanctum', 'role:admin'])
     ->prefix('admin')
@@ -148,36 +113,34 @@ Route::middleware(['auth:sanctum', 'role:admin'])
 
         Route::get('/profile', [AdminProfileController::class, 'show']);
         Route::put('/profile', [AdminProfileController::class, 'update']);
+
+        Route::get('/deliveries', [AdminDeliveryController::class, 'index']);
+        Route::get('/delivery-men', [AdminDeliveryController::class, 'deliveryMen']);
+        Route::put('/deliveries/{delivery}/assign', [AdminDeliveryController::class, 'assign']);
+        Route::put('/deliveries/{delivery}/cancel', [AdminDeliveryController::class, 'cancel']);
     });
 
-/*
-|--------------------------------------------------------------------------
-| Management / Delivery / Payment Routes
-|--------------------------------------------------------------------------
-*/
+Route::middleware('auth:sanctum')
+    ->prefix('delivery')
+    ->group(function () {
+        Route::get('/stats', [DeliveryController::class, 'stats']);
 
-/*
-|--------------------------------------------------------------------------
-| Delivery Man Routes
-|--------------------------------------------------------------------------
-*/
+        Route::get('/orders', [DeliveryController::class, 'assignedDeliveries']);
+        Route::get('/orders/{id}', [DeliveryController::class, 'show']);
+        Route::put('/orders/{id}/status', [DeliveryController::class, 'updateStatus']);
+        Route::put('/orders/{id}/location', [DeliveryController::class, 'updateLocation']);
+        Route::put('/orders/{id}/accept', [DeliveryController::class, 'acceptDelivery']);
 
-Route::prefix('delivery')->middleware('auth:sanctum')->group(function () {
-    Route::get('/stats', [DeliveryController::class, 'stats']);
-    Route::get('/orders', [DeliveryController::class, 'orders']);
-    Route::get('/history', [DeliveryController::class, 'history']);
-    Route::get('/profile', [DeliveryController::class, 'profile']);
-});
+        Route::get('/available', [DeliveryController::class, 'availableDeliveries']);
+        Route::get('/history', [DeliveryController::class, 'history']);
 
-Route::middleware(['auth:sanctum', 'activity.log'])->group(function () {
-    Route::get('/me', [AuthController::class, 'me']);
+        Route::get('/profile', [DeliveryController::class, 'profile']);
+        Route::put('/profile', [DeliveryController::class, 'updateProfile']);
+    });
 
+Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/dashboard/charts', [DashboardController::class, 'charts']);
-
-    Route::middleware('permission:manage-users')->group(function () {
-        Route::apiResource('/users', UserController::class);
-    });
 
     Route::middleware('permission:manage-roles')->group(function () {
         Route::apiResource('/roles', RolePermissionController::class);
@@ -185,38 +148,14 @@ Route::middleware(['auth:sanctum', 'activity.log'])->group(function () {
         Route::get('/permissions', [RolePermissionController::class, 'allPermissions']);
     });
 
-    Route::apiResource('/orders', OrderController::class);
-    Route::post('/orders/{order}/assign', [OrderController::class, 'assignDeliveryMan']);
-    Route::post('/orders/{order}/status', [OrderController::class, 'updateStatus']);
-
-    Route::apiResource('/deliveries', DeliveryController::class);
-    Route::post('/deliveries/{delivery}/proof', [DeliveryController::class, 'uploadProof']);
-
     Route::get('/payments', [PaymentController::class, 'index']);
-    Route::post('/payments/stripe/intent', [PaymentController::class, 'createStripeIntent']);
-    Route::post('/payments/stripe/confirm', [PaymentController::class, 'confirmStripe']);
     Route::post('/payments/khqr/generate', [PaymentController::class, 'generateKHQR']);
     Route::post('/payments/khqr/verify', [PaymentController::class, 'verifyKHQR']);
     Route::get('/payments/{payment}', [PaymentController::class, 'show']);
-
-    Route::get('/tracking/{order}', [TrackingController::class, 'getLocation']);
-    Route::post('/tracking/update', [TrackingController::class, 'updateLocation']);
-    Route::get('/tracking/history/{order}', [TrackingController::class, 'history']);
 
     Route::post('/routes/optimize', [RouteOptimizationController::class, 'optimize']);
     Route::get('/routes/delivery-man/{id}', [RouteOptimizationController::class, 'getOptimizedRoute']);
 
     Route::get('/invoices/{order}/download', [InvoiceController::class, 'download']);
     Route::get('/invoices/{order}/preview', [InvoiceController::class, 'preview']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Activity Logs
-    |--------------------------------------------------------------------------
-    | Commented for now because the controller namespace is still causing errors.
-    */
-
-    // Route::get('/activity-logs', [ActivityLogController::class, 'index']);
-    // Route::get('/activity-logs/export', [ActivityLogController::class, 'export']);
-    // Route::delete('/activity-logs/clear', [ActivityLogController::class, 'clear']);
 });

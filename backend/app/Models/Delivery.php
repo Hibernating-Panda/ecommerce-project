@@ -4,8 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Delivery extends Model
 {
@@ -13,6 +11,7 @@ class Delivery extends Model
 
     protected $fillable = [
         'order_id',
+        'shop_id',
         'driver_id',
         'status',
         'pickup_location',
@@ -27,44 +26,59 @@ class Delivery extends Model
         'started_at',
         'picked_up_at',
         'completed_at',
-        'notes'
+        'notes',
     ];
 
     protected $casts = [
+        'pickup_lat' => 'decimal:8',
+        'pickup_lng' => 'decimal:8',
+        'current_lat' => 'decimal:8',
+        'current_lng' => 'decimal:8',
+        'delivery_lat' => 'decimal:8',
+        'delivery_lng' => 'decimal:8',
+        'estimated_time' => 'integer',
         'started_at' => 'datetime',
         'picked_up_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
 
-    /**
-     * Get the order associated with this delivery
-     */
-    public function order(): BelongsTo
+    public function order()
     {
         return $this->belongsTo(Order::class);
     }
 
-    /**
-     * Get the driver/user associated with this delivery
-     */
-    public function driver(): BelongsTo
+    public function shop()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Shop::class);
     }
 
-    /**
-     * Get all location updates for this delivery
-     */
-    public function locations(): HasMany
+    public function driver()
+    {
+        return $this->belongsTo(User::class, 'driver_id');
+    }
+
+    public function items()
+    {
+        return $this->hasMany(DeliveryItem::class);
+    }
+
+    public function orderItems()
+    {
+        return $this->belongsToMany(
+            OrderItem::class,
+            'delivery_items',
+            'delivery_id',
+            'order_item_id'
+        );
+    }
+
+    public function locations()
     {
         return $this->hasMany(Location::class);
     }
 
-    /**
-     * Get the latest location for this delivery
-     */
     public function latestLocation()
     {
-        return $this->hasOne(Location::class)->latest('timestamp');
+        return $this->hasOne(Location::class)->latestOfMany('timestamp');
     }
 }

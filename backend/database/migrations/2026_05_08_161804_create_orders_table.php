@@ -11,25 +11,40 @@ return new class extends Migration
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('shop_id')
-                ->nullable()
-                ->constrained('shops')
-                ->onDelete('cascade');
+            $table->foreignId('customer_id')
+                ->constrained('users')
+                ->cascadeOnDelete();
 
             $table->string('customer_name')->nullable();
-            $table->string('product_name')->nullable();
-            $table->integer('quantity')->default(1);
-            $table->decimal('total', 10, 2)->default(0);
+            $table->text('delivery_address')->nullable();
+
+            $table->enum('payment_method', ['cash', 'online'])
+                ->default('cash');
+
+            $table->enum('order_type', ['pickup', 'delivery'])
+                ->nullable();
+
+            $table->dateTime('pickup_date')->nullable();
 
             $table->enum('status', [
-                'Pending',
-                'Processing',
-                'Completed',
-                'Cancelled'
-            ])->default('Pending');
+                'pending',
+                'accepted',
+                'partially_rejected',
+                'cancelled',
+                'ready_for_delivery',
+                'in_transit',
+                'delivered',
+                'completed',
+            ])->default('pending');
 
-            $table->date('order_date')->nullable();
+            $table->decimal('total', 10, 2)->default(0);
+            $table->timestamp('order_date')->nullable();
             $table->timestamps();
+
+            $table->index(['customer_id', 'status']);
+            $table->index('payment_method');
+            $table->index('order_type');
+            $table->index('created_at');
         });
     }
 
