@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 
 class ShopController extends Controller
 {
-    // GET /api/shops
     public function index()
     {
         $shops = Shop::withCount('products')
@@ -26,7 +25,6 @@ class ShopController extends Controller
         ]);
     }
 
-    // GET /api/shops/{id}
     public function show($id)
     {
         $shop = Shop::with([
@@ -38,7 +36,7 @@ class ShopController extends Controller
             ->withCount('reviews')
             ->find($id);
 
-        if (!$shop) {
+        if (! $shop) {
             return response()->json([
                 'success' => false,
                 'message' => 'Shop not found',
@@ -51,7 +49,6 @@ class ShopController extends Controller
         ]);
     }
 
-    // POST /api/shops
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -61,9 +58,20 @@ class ShopController extends Controller
             'address' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'user_id' => 'nullable|exists:users,id',
+            'shop_logo' => 'nullable|string',
             'logo' => 'nullable|string',
             'image' => 'nullable|string',
         ]);
+
+        if (! empty($validated['logo']) && empty($validated['shop_logo'])) {
+            $validated['shop_logo'] = $validated['logo'];
+        }
+
+        if (! empty($validated['image']) && empty($validated['shop_logo'])) {
+            $validated['shop_logo'] = $validated['image'];
+        }
+
+        unset($validated['logo'], $validated['image']);
 
         $shop = Shop::create($validated);
 
@@ -74,12 +82,11 @@ class ShopController extends Controller
         ], 201);
     }
 
-    // PUT /api/shops/{id}
     public function update(Request $request, $id)
     {
         $shop = Shop::find($id);
 
-        if (!$shop) {
+        if (! $shop) {
             return response()->json([
                 'success' => false,
                 'message' => 'Shop not found',
@@ -93,9 +100,20 @@ class ShopController extends Controller
             'address' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'user_id' => 'nullable|exists:users,id',
+            'shop_logo' => 'nullable|string',
             'logo' => 'nullable|string',
             'image' => 'nullable|string',
         ]);
+
+        if (! empty($validated['logo']) && empty($validated['shop_logo'])) {
+            $validated['shop_logo'] = $validated['logo'];
+        }
+
+        if (! empty($validated['image']) && empty($validated['shop_logo'])) {
+            $validated['shop_logo'] = $validated['image'];
+        }
+
+        unset($validated['logo'], $validated['image']);
 
         $shop->update($validated);
 
@@ -110,12 +128,11 @@ class ShopController extends Controller
         ]);
     }
 
-    // DELETE /api/shops/{id}
     public function destroy($id)
     {
         $shop = Shop::find($id);
 
-        if (!$shop) {
+        if (! $shop) {
             return response()->json([
                 'success' => false,
                 'message' => 'Shop not found',
@@ -132,7 +149,7 @@ class ShopController extends Controller
 
     private function formatShop($shop)
     {
-        $logo = $shop->logo ?? $shop->image ?? null;
+        $logo = $shop->shop_logo ?? null;
 
         return [
             'id' => $shop->id,
@@ -145,9 +162,12 @@ class ShopController extends Controller
             'address' => $shop->address,
             'description' => $shop->description,
 
+            'shop_logo' => $logo,
             'logo' => $logo,
             'image' => $logo,
+            'shop_logo_url' => $this->getImageUrl($logo),
             'logo_url' => $this->getImageUrl($logo),
+            'image_url' => $this->getImageUrl($logo),
 
             'products_count' => $shop->products_count ?? 0,
             'items_count' => $shop->products_count ?? 0,
@@ -163,12 +183,15 @@ class ShopController extends Controller
 
             'created_at' => $shop->created_at,
             'updated_at' => $shop->updated_at,
+            
+            'latitude' => $shop->latitude,
+            'longitude' => $shop->longitude,
         ];
     }
 
     private function getImageUrl($image)
     {
-        if (!$image) {
+        if (! $image) {
             return null;
         }
 

@@ -18,7 +18,7 @@ class HomeController extends Controller
 
     private function baseProductQuery()
     {
-        return Product::with(['category', 'shop'])
+        return Product::with(['category', 'shop', 'sizes'])
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->where('status', 'active');
@@ -90,6 +90,7 @@ class HomeController extends Controller
             'shop' => $product->shop,
             'created_at' => $product->created_at,
             'updated_at' => $product->updated_at,
+            'sizes' => $product->sizes ?? [],
         ];
     }
 
@@ -97,7 +98,7 @@ class HomeController extends Controller
     {
         if (! $image) {
             return null;
-        }
+        } 
 
         if (str_starts_with($image, 'http://') || str_starts_with($image, 'https://')) {
             return $image;

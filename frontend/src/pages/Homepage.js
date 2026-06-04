@@ -48,15 +48,6 @@ const HERO_SLIDES = [
   },
 ];
 
-const BRANDS = [
-  { name: "Samsung", bg: "#1428A0" },
-  { name: "Apple", bg: "#555" },
-  { name: "Nike", bg: "#111" },
-  { name: "Adidas", bg: "#222" },
-  { name: "Sony", bg: "#333" },
-  { name: "LG", bg: "#A50034" },
-];
-
 function getCategoryIcon(categoryName) {
   const name = String(categoryName || "").toLowerCase();
 
@@ -80,6 +71,10 @@ function getShopName(shop) {
 
 function getShopLogo(shop) {
   return (
+    shop?.shop_logo_url ||
+    shop?.logo_url ||
+    shop?.image_url ||
+    shop?.shop_logo ||
     shop?.logo ||
     shop?.image ||
     shop?.photo ||
@@ -99,10 +94,43 @@ function getProductImage(product) {
   );
 }
 
+function isDiscountActive(product) {
+  const discountPercent = Number(
+    product?.discount_percent || product?.discount || 0
+  );
+  const discountPrice = Number(product?.discount_price || 0);
+
+  if (discountPercent <= 0 && discountPrice <= 0) {
+    return false;
+  }
+
+  const now = new Date();
+
+  if (product?.discount_start && new Date(product.discount_start) > now) {
+    return false;
+  }
+
+  if (product?.discount_end && new Date(product.discount_end) < now) {
+    return false;
+  }
+
+  return true;
+}
+
 function getProductPrice(product) {
   const price = Number(product?.price || 0);
-  const discountPercent = Number(product?.discount_percent || product?.discount || 0);
+  const discountPercent = Number(
+    product?.discount_percent || product?.discount || 0
+  );
   const discountPrice = Number(product?.discount_price || 0);
+
+  if (!isDiscountActive(product)) {
+    return {
+      originalPrice: price,
+      finalPrice: price,
+      discount: 0,
+    };
+  }
 
   if (discountPrice > 0 && discountPrice < price) {
     return {
@@ -125,6 +153,33 @@ function getProductPrice(product) {
     finalPrice: price,
     discount: 0,
   };
+}
+
+function getProductSizes(product) {
+  if (!product?.sizes || !Array.isArray(product.sizes)) return [];
+
+  const sizeOrder = {
+    xs: 1,
+    s: 2,
+    m: 3,
+    l: 4,
+    xl: 5,
+    xxl: 6,
+    xxxl: 7,
+  };
+
+  return [...product.sizes]
+    .filter((item) => item?.size)
+    .sort((a, b) => {
+      const sizeA = String(a.size).toLowerCase().trim();
+      const sizeB = String(b.size).toLowerCase().trim();
+
+      const orderA = sizeOrder[sizeA] || Number(sizeA) || 999;
+      const orderB = sizeOrder[sizeB] || Number(sizeB) || 999;
+
+      return orderA - orderB;
+    })
+    .slice(0, 4);
 }
 
 function formatRating(value) {
@@ -189,7 +244,8 @@ function HeroBanner({ onAction }) {
             style={{
               ...styles.heroDot,
               width: index === active ? 22 : 7,
-              background: index === active ? "#ffffff" : "rgba(255,255,255,0.45)",
+              background:
+                index === active ? "#ffffff" : "rgba(255,255,255,0.45)",
             }}
           />
         ))}
@@ -219,9 +275,11 @@ function ProductCard({ product, compact, onClick }) {
   const { originalPrice, finalPrice, discount } = getProductPrice(product);
 
   const rating = formatRating(product.average_rating);
-  const reviewCount = product.reviews_count || product.product_reviews_count || 0;
+  const reviewCount =
+    product.reviews_count || product.product_reviews_count || 0;
   const sold = product.sold || product.total_sold || product.quantity_sold || 0;
   const hue = ((product.id || 1) * 37) % 360;
+  const sizes = getProductSizes(product);
 
   return (
     <div
@@ -252,9 +310,7 @@ function ProductCard({ product, compact, onClick }) {
           }}
         />
 
-        {!compact && discount > 0 && (
-          <span style={styles.discountBadge}>-{discount}%</span>
-        )}
+        {discount > 0 && <span style={styles.discountBadge}>-{discount}%</span>}
       </div>
 
       <div
@@ -266,6 +322,20 @@ function ProductCard({ product, compact, onClick }) {
       >
         {product.name}
       </div>
+
+      {sizes.length > 0 && (
+        <div style={styles.sizeList}>
+          {sizes.map((item) => (
+            <span key={item.id || item.size} style={styles.sizeChip}>
+              {item.size}
+            </span>
+          ))}
+
+          {product.sizes.length > 4 && (
+            <span style={styles.sizeMore}>+{product.sizes.length - 4}</span>
+          )}
+        </div>
+      )}
 
       <div style={styles.priceRow}>
         <span
@@ -287,7 +357,8 @@ function ProductCard({ product, compact, onClick }) {
           {reviewCount > 0 && rating ? (
             <>
               ⭐ {rating} · {reviewCount} review
-              {reviewCount > 1 ? "s" : ""} · {Number(sold).toLocaleString()} sold
+              {reviewCount > 1 ? "s" : ""} ·{" "}
+              {Number(sold).toLocaleString()} sold
             </>
           ) : (
             <>No reviews yet · {Number(sold).toLocaleString()} sold</>
@@ -349,7 +420,8 @@ function ShopCard({ shop, index, onClick }) {
           {reviewCount > 0 && rating ? (
             <>
               ⭐ {rating} · {reviewCount} review
-              {reviewCount > 1 ? "s" : ""} · {Number(itemCount).toLocaleString()} items
+              {reviewCount > 1 ? "s" : ""} ·{" "}
+              {Number(itemCount).toLocaleString()} items
             </>
           ) : (
             <>No reviews yet · {Number(itemCount).toLocaleString()} items</>
@@ -453,7 +525,9 @@ export default function HomePage() {
         ? categoryJson
         : categoryJson.data || [];
 
-      const realShops = Array.isArray(shopJson) ? shopJson : shopJson.data || [];
+      const realShops = Array.isArray(shopJson)
+        ? shopJson
+        : shopJson.data || [];
 
       setHomeData({
         flash_sale: homeJson.flash_sale || [],
@@ -555,61 +629,34 @@ export default function HomePage() {
           <aside style={styles.categoryPanel}>
             <div style={styles.panelTitle}>☰ CATEGORY</div>
 
-            {categories.length === 0 && !loading ? (
-              <div style={styles.panelEmpty}>No categories found.</div>
-            ) : (
-              categories.map((cat, index) => (
-                <button
-                  key={cat.id || index}
-                  type="button"
-                  onClick={() => {
-                    setActiveCategory(index);
-                    requireLogin(cat.route);
-                  }}
-                  style={{
-                    ...styles.categoryItem,
-                    ...(activeCategory === index ? styles.activeCategoryItem : {}),
-                  }}
-                >
-                  <span style={styles.categoryIcon}>{cat.icon}</span>
-                  <span>{cat.label}</span>
-                </button>
-              ))
-            )}
+            <div style={styles.categoryScroll}>
+              {categories.length === 0 && !loading ? (
+                <div style={styles.panelEmpty}>No categories found.</div>
+              ) : (
+                categories.map((cat, index) => (
+                  <button
+                    key={cat.id || index}
+                    type="button"
+                    onClick={() => {
+                      setActiveCategory(index);
+                      requireLogin(cat.route);
+                    }}
+                    style={{
+                      ...styles.categoryItem,
+                      ...(activeCategory === index
+                        ? styles.activeCategoryItem
+                        : {}),
+                    }}
+                  >
+                    <span style={styles.categoryIcon}>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                  </button>
+                ))
+              )}
+            </div>
           </aside>
 
           <HeroBanner onAction={goToProductList} />
-
-          <aside style={styles.sidePanel}>
-            <div style={styles.brandBox}>
-              <div style={styles.panelTitle}>POPULAR BRANDS</div>
-
-              <div style={styles.brandGrid}>
-                {BRANDS.map((brand, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => requireLogin(`/brand/${brand.name.toLowerCase()}`)}
-                    style={{
-                      ...styles.brandItem,
-                      background: brand.bg,
-                    }}
-                  >
-                    {brand.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => requireLogin("/flash-sale")}
-              style={styles.flashMini}
-            >
-              <strong>🔥 FLASH SALE</strong>
-              <span>Discount products</span>
-            </button>
-          </aside>
         </section>
 
         <section style={styles.section}>
@@ -744,7 +791,9 @@ export default function HomePage() {
           <div>
             <div style={styles.bannerLabel}>NEW ARRIVAL</div>
             <div style={styles.bannerTitle}>Discover New Products</div>
-            <div style={styles.bannerText}>Newest products appear in Best Deal</div>
+            <div style={styles.bannerText}>
+              Newest products appear in Best Deal
+            </div>
           </div>
 
           <button
@@ -771,6 +820,7 @@ const styles = {
     background: COLORS.bg,
     minHeight: "100vh",
   },
+
   main: {
     width: "100%",
     maxWidth: 1700,
@@ -778,31 +828,50 @@ const styles = {
     padding: "clamp(14px, 2vw, 24px)",
     boxSizing: "border-box",
   },
+
   topGrid: {
     display: "grid",
-    gridTemplateColumns: "minmax(170px, 210px) minmax(0, 1fr) minmax(160px, 190px)",
+    gridTemplateColumns: "minmax(190px, 240px) minmax(0, 1fr)",
     gap: 14,
     marginBottom: 28,
+    alignItems: "stretch",
   },
+
   categoryPanel: {
     background: COLORS.white,
-    borderRadius: 12,
-    border: `1px solid ${COLORS.border}`,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: COLORS.border,
     overflow: "hidden",
+    height: 230,
+    display: "flex",
+    flexDirection: "column",
   },
+
   panelTitle: {
     padding: "10px 14px",
-    borderBottom: `1px solid ${COLORS.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: COLORS.border,
     fontSize: 11,
     fontWeight: 900,
     color: COLORS.textMuted,
     letterSpacing: 0.8,
+    flexShrink: 0,
   },
+
+  categoryScroll: {
+    overflowY: "auto",
+    flex: 1,
+  },
+
   panelEmpty: {
     padding: 14,
     fontSize: 12,
     color: COLORS.textMuted,
   },
+
   categoryItem: {
     width: "100%",
     padding: "10px 14px",
@@ -814,35 +883,42 @@ const styles = {
     background: "transparent",
     color: COLORS.text,
     border: "none",
-    borderLeft: "3px solid transparent",
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: "transparent",
     textAlign: "left",
     transition: "all 0.15s",
   },
+
   activeCategoryItem: {
     background: COLORS.primaryLight,
     color: COLORS.primaryDark,
-    borderLeft: `3px solid ${COLORS.primary}`,
+    borderLeftColor: COLORS.primary,
     fontWeight: 800,
   },
+
   categoryIcon: {
     fontSize: 15,
   },
+
   hero: {
     borderRadius: 14,
     overflow: "hidden",
     position: "relative",
-    minHeight: 230,
+    height: 230,
     display: "flex",
     alignItems: "center",
     padding: "clamp(24px, 4vw, 42px)",
     boxSizing: "border-box",
     transition: "background 0.6s",
   },
+
   heroContent: {
     zIndex: 1,
     flex: 1,
     maxWidth: 540,
   },
+
   heroBadge: {
     display: "inline-block",
     fontSize: 11,
@@ -852,17 +928,20 @@ const styles = {
     borderRadius: 999,
     marginBottom: 10,
   },
+
   heroTitle: {
     color: COLORS.white,
     fontSize: "clamp(28px, 4vw, 42px)",
     fontWeight: 900,
     margin: "0 0 8px",
   },
+
   heroSubtitle: {
     color: "rgba(255,255,255,0.84)",
     fontSize: 15,
     margin: "0 0 18px",
   },
+
   heroButton: {
     border: "none",
     padding: "11px 24px",
@@ -871,6 +950,7 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
   },
+
   heroIcon: {
     position: "absolute",
     right: 28,
@@ -878,6 +958,7 @@ const styles = {
     fontSize: 110,
     opacity: 0.12,
   },
+
   heroDots: {
     position: "absolute",
     bottom: 14,
@@ -886,6 +967,7 @@ const styles = {
     display: "flex",
     gap: 6,
   },
+
   heroDot: {
     height: 7,
     borderRadius: 999,
@@ -893,49 +975,11 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.3s",
   },
-  sidePanel: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-  },
-  brandBox: {
-    background: COLORS.white,
-    borderRadius: 12,
-    border: `1px solid ${COLORS.border}`,
-    paddingBottom: 10,
-    flex: 1,
-  },
-  brandGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: 6,
-    padding: 10,
-  },
-  brandItem: {
-    borderRadius: 7,
-    padding: "7px 2px",
-    textAlign: "center",
-    cursor: "pointer",
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: 900,
-    border: "none",
-  },
-  flashMini: {
-    background: "linear-gradient(135deg,#16a34a,#22c55e)",
-    borderRadius: 12,
-    padding: 14,
-    cursor: "pointer",
-    color: COLORS.white,
-    border: "none",
-    textAlign: "left",
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  },
+
   section: {
     marginBottom: 30,
   },
+
   sectionHeader: {
     display: "flex",
     alignItems: "center",
@@ -944,12 +988,14 @@ const styles = {
     gap: 10,
     flexWrap: "wrap",
   },
+
   sectionTitle: {
     fontSize: 18,
     fontWeight: 900,
     color: COLORS.text,
     margin: 0,
   },
+
   sectionLink: {
     fontSize: 13,
     color: COLORS.primaryDark,
@@ -958,20 +1004,25 @@ const styles = {
     border: "none",
     background: "transparent",
   },
+
   shopGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
     gap: 14,
   },
+
   partnerGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
     gap: 14,
   },
+
   shopCard: {
     background: COLORS.white,
     borderRadius: 14,
-    border: `1px solid ${COLORS.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: COLORS.border,
     padding: 16,
     cursor: "pointer",
     display: "flex",
@@ -980,6 +1031,7 @@ const styles = {
     gap: 10,
     transition: "all 0.2s",
   },
+
   shopLogo: {
     width: 58,
     height: 58,
@@ -989,28 +1041,34 @@ const styles = {
     justifyContent: "center",
     overflow: "hidden",
   },
+
   shopLogoImg: {
     width: "100%",
     height: "100%",
     objectFit: "cover",
   },
+
   shopText: {
     textAlign: "center",
   },
+
   shopName: {
     fontSize: 14,
     fontWeight: 900,
     color: COLORS.text,
   },
+
   verified: {
     color: COLORS.primary,
     fontSize: 12,
   },
+
   shopMeta: {
     fontSize: 12,
     color: COLORS.textMuted,
     marginTop: 3,
   },
+
   visitButton: {
     background: COLORS.primaryLight,
     color: COLORS.primaryDark,
@@ -1021,15 +1079,19 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
   },
+
   partnerCard: {
     borderRadius: 14,
-    border: `1px solid ${COLORS.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: COLORS.border,
     padding: "16px 18px",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
     gap: 14,
   },
+
   partnerLogo: {
     width: 52,
     height: 52,
@@ -1042,9 +1104,11 @@ const styles = {
     overflow: "hidden",
     flexShrink: 0,
   },
+
   partnerText: {
     minWidth: 0,
   },
+
   partnerName: {
     fontWeight: 900,
     fontSize: 15,
@@ -1053,6 +1117,7 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
+
   partnerDescription: {
     fontSize: 13,
     color: COLORS.textMuted,
@@ -1061,12 +1126,14 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
+
   partnerBrowse: {
     fontSize: 12,
     color: COLORS.primaryDark,
     marginTop: 5,
     fontWeight: 900,
   },
+
   flashBanner: {
     background: "linear-gradient(135deg,#15803d,#22c55e)",
     borderRadius: 16,
@@ -1078,6 +1145,7 @@ const styles = {
     marginBottom: 30,
     flexWrap: "wrap",
   },
+
   newArrivalBanner: {
     background: "linear-gradient(135deg,#166534,#0f766e)",
     borderRadius: 16,
@@ -1089,22 +1157,26 @@ const styles = {
     marginBottom: 30,
     flexWrap: "wrap",
   },
+
   bannerLabel: {
     color: "rgba(255,255,255,0.8)",
     fontSize: 12,
     fontWeight: 900,
     letterSpacing: 1.2,
   },
+
   bannerTitle: {
     color: COLORS.white,
     fontSize: "clamp(21px, 3vw, 28px)",
     fontWeight: 900,
     margin: "5px 0",
   },
+
   bannerText: {
     color: "rgba(255,255,255,0.82)",
     fontSize: 14,
   },
+
   bannerButton: {
     background: COLORS.white,
     color: COLORS.primaryDark,
@@ -1115,24 +1187,30 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
   },
+
   compactProductGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 145px), 1fr))",
     gap: 12,
   },
+
   productGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 210px), 1fr))",
     gap: 16,
   },
+
   productCard: {
     background: COLORS.white,
     borderRadius: 14,
-    border: `1px solid ${COLORS.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: COLORS.border,
     cursor: "pointer",
     transition: "all 0.2s",
     minWidth: 0,
   },
+
   productImageBox: {
     width: "100%",
     aspectRatio: "1",
@@ -1144,12 +1222,14 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
   },
+
   productImage: {
     width: "100%",
     height: "100%",
     objectFit: "contain",
     borderRadius: 10,
   },
+
   discountBadge: {
     position: "absolute",
     top: 7,
@@ -1161,6 +1241,7 @@ const styles = {
     padding: "3px 7px",
     borderRadius: 999,
   },
+
   productName: {
     color: COLORS.text,
     marginBottom: 6,
@@ -1169,6 +1250,37 @@ const styles = {
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical",
   },
+
+  sizeList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 5,
+    marginBottom: 7,
+  },
+
+  sizeChip: {
+    background: COLORS.primaryLight,
+    color: COLORS.primaryDark,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: COLORS.border,
+    borderRadius: 999,
+    padding: "2px 7px",
+    fontSize: 10,
+    fontWeight: 900,
+    lineHeight: 1.4,
+  },
+
+  sizeMore: {
+    background: "#f3f4f6",
+    color: COLORS.textMuted,
+    borderRadius: 999,
+    padding: "2px 7px",
+    fontSize: 10,
+    fontWeight: 900,
+    lineHeight: 1.4,
+  },
+
   priceRow: {
     display: "flex",
     alignItems: "center",
@@ -1176,26 +1288,32 @@ const styles = {
     marginBottom: 4,
     flexWrap: "wrap",
   },
+
   finalPrice: {
     fontWeight: 900,
     color: COLORS.primaryDark,
   },
+
   oldPrice: {
     fontSize: 11,
     color: COLORS.textMuted,
     textDecoration: "line-through",
   },
+
   productMeta: {
     fontSize: 11,
     color: COLORS.textMuted,
   },
+
   emptyBox: {
     background: COLORS.white,
     padding: 24,
     borderRadius: 14,
     color: COLORS.textMuted,
     textAlign: "center",
-    border: `1px solid ${COLORS.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: COLORS.border,
     marginBottom: 12,
     fontWeight: 700,
   },

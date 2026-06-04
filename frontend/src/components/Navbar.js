@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
 
 const COLORS = {
   customer: "#16a34a",
@@ -24,6 +25,7 @@ const Navbar = () => {
   const [loginMessage, setLoginMessage] = useState("");
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const dropdownRef = useRef(null);
 
@@ -57,6 +59,48 @@ const Navbar = () => {
       description: "Manage assigned deliveries",
     },
   ];
+
+  useEffect(() => {
+    setImageError(false);
+  }, [user?.profile_image_url, user?.profile_image]);
+
+  const getApiBaseUrl = () => {
+    const baseUrl = api.defaults.baseURL || "http://127.0.0.1:8000/api";
+    return baseUrl.replace(/\/api\/?$/, "");
+  };
+
+  const normalizeImageUrl = (image) => {
+    if (!image) return "";
+
+    if (image.startsWith("http://") || image.startsWith("https://")) {
+      return image;
+    }
+
+    if (image.startsWith("/storage/")) {
+      return `${getApiBaseUrl()}${image}`;
+    }
+
+    if (image.startsWith("storage/")) {
+      return `${getApiBaseUrl()}/${image}`;
+    }
+
+    return `${getApiBaseUrl()}/storage/${image}`;
+  };
+
+  const profileImageSrc = useMemo(() => {
+    return normalizeImageUrl(user?.profile_image_url || user?.profile_image || "");
+  }, [user]);
+
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "?";
+
+  const isCustomer = user?.role === "user" || user?.role === "customer";
 
   const redirectByRole = (role) => {
     if (role === "admin") {
@@ -343,17 +387,6 @@ const Navbar = () => {
     }
   }, [location.pathname, navigate]);
 
-  const initials = user?.name
-    ? user.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
-    : "?";
-
-  const isCustomer = user?.role === "user" || user?.role === "customer";
-
   const customerMenu = [
     {
       label: "Dashboard",
@@ -379,6 +412,11 @@ const Navbar = () => {
       label: "Reviews",
       icon: "⭐",
       action: () => requireLogin("/customer/reviews"),
+    },
+    {
+      label: "Order History",
+      icon: "📜",
+      action: () => requireLogin("/customer/order-history"),
     },
     {
       label: "Edit Profile",
@@ -445,12 +483,23 @@ const Navbar = () => {
                 onClick={() => setDropdownOpen((open) => !open)}
                 style={{
                   ...styles.avatar,
-                  border: dropdownOpen
-                    ? `2px solid ${COLORS.customerDark}`
-                    : "2px solid transparent",
+                  borderWidth: 2,
+                  borderStyle: "solid",
+                  borderColor: dropdownOpen
+                    ? COLORS.customerDark
+                    : "transparent",
                 }}
               >
-                {initials}
+                {profileImageSrc && !imageError ? (
+                  <img
+                    src={profileImageSrc}
+                    alt={user?.name || "Profile"}
+                    style={styles.avatarImage}
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  initials
+                )}
               </div>
 
               {dropdownOpen && (
@@ -480,7 +529,13 @@ const Navbar = () => {
                     </div>
                   ))}
 
-                  <div style={{ borderTop: "1px solid #f0f0f0" }}>
+                  <div
+                    style={{
+                      borderTopWidth: 1,
+                      borderTopStyle: "solid",
+                      borderTopColor: "#f0f0f0",
+                    }}
+                  >
                     <div onClick={handleLogout} style={styles.logoutItem}>
                       <span>🚪</span>
                       Logout
@@ -523,12 +578,13 @@ const Navbar = () => {
                   placeholder="Enter your email"
                   style={{
                     ...styles.input,
-                    border: getError("email")
-                      ? `1px solid ${COLORS.danger}`
-                      : "1px solid #ddd",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: getError("email") ? COLORS.danger : "#ddd",
                   }}
                   required
                 />
+
                 {getError("email") && (
                   <p style={styles.fieldError}>{getError("email")}</p>
                 )}
@@ -542,12 +598,13 @@ const Navbar = () => {
                   placeholder="Enter your password"
                   style={{
                     ...styles.input,
-                    border: getError("password")
-                      ? `1px solid ${COLORS.danger}`
-                      : "1px solid #ddd",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: getError("password") ? COLORS.danger : "#ddd",
                   }}
                   required
                 />
+
                 {getError("password") && (
                   <p style={styles.fieldError}>{getError("password")}</p>
                 )}
@@ -578,12 +635,13 @@ const Navbar = () => {
                   placeholder="Enter your name"
                   style={{
                     ...styles.input,
-                    border: getError("name")
-                      ? `1px solid ${COLORS.danger}`
-                      : "1px solid #ddd",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: getError("name") ? COLORS.danger : "#ddd",
                   }}
                   required
                 />
+
                 {getError("name") && (
                   <p style={styles.fieldError}>{getError("name")}</p>
                 )}
@@ -597,12 +655,13 @@ const Navbar = () => {
                   placeholder="Enter your email"
                   style={{
                     ...styles.input,
-                    border: getError("email")
-                      ? `1px solid ${COLORS.danger}`
-                      : "1px solid #ddd",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: getError("email") ? COLORS.danger : "#ddd",
                   }}
                   required
                 />
+
                 {getError("email") && (
                   <p style={styles.fieldError}>{getError("email")}</p>
                 )}
@@ -614,9 +673,9 @@ const Navbar = () => {
                   onChange={handleRegisterChange}
                   style={{
                     ...styles.input,
-                    border: getError("role")
-                      ? `1px solid ${COLORS.danger}`
-                      : "1px solid #ddd",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: getError("role") ? COLORS.danger : "#ddd",
                   }}
                   required
                 >
@@ -647,12 +706,13 @@ const Navbar = () => {
                   placeholder="Enter your password"
                   style={{
                     ...styles.input,
-                    border: getError("password")
-                      ? `1px solid ${COLORS.danger}`
-                      : "1px solid #ddd",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: getError("password") ? COLORS.danger : "#ddd",
                   }}
                   required
                 />
+
                 {getError("password") && (
                   <p style={styles.fieldError}>{getError("password")}</p>
                 )}
@@ -666,12 +726,15 @@ const Navbar = () => {
                   placeholder="Confirm your password"
                   style={{
                     ...styles.input,
-                    border: getError("password_confirmation")
-                      ? `1px solid ${COLORS.danger}`
-                      : "1px solid #ddd",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: getError("password_confirmation")
+                      ? COLORS.danger
+                      : "#ddd",
                   }}
                   required
                 />
+
                 {getError("password_confirmation") && (
                   <p style={styles.fieldError}>
                     {getError("password_confirmation")}
@@ -707,7 +770,9 @@ const styles = {
     top: 0,
     zIndex: 100,
     backgroundColor: COLORS.white,
-    borderBottom: `2px solid ${COLORS.customer}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: COLORS.customer,
     padding: "0 clamp(12px, 3vw, 24px)",
     minHeight: 60,
     display: "flex",
@@ -742,7 +807,9 @@ const styles = {
   searchBox: {
     display: "flex",
     width: "100%",
-    border: "1px solid #ddd",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "#ddd",
     borderRadius: 6,
     overflow: "hidden",
     background: "#f5f5f5",
@@ -798,11 +865,22 @@ const styles = {
     fontWeight: 700,
     cursor: "pointer",
     userSelect: "none",
+    overflow: "hidden",
+    boxSizing: "border-box",
+  },
+
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
   },
 
   outlineButton: {
     background: COLORS.white,
-    border: "1px solid #ddd",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "#ddd",
     color: "#333",
     padding: "8px 15px",
     borderRadius: 6,
@@ -827,7 +905,9 @@ const styles = {
     right: 0,
     top: 42,
     background: COLORS.white,
-    border: "1px solid #eee",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "#eee",
     borderRadius: 8,
     boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
     minWidth: 220,
@@ -837,7 +917,9 @@ const styles = {
 
   userInfo: {
     padding: "12px 16px",
-    borderBottom: "1px solid #f0f0f0",
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: "#f0f0f0",
   },
 
   userName: {

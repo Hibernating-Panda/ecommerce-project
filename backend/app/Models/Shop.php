@@ -12,15 +12,34 @@ class Shop extends Model
         'owner_name',
         'phone',
         'address',
+        'latitude',
+        'longitude',
         'description',
+        'shop_logo',
         'aba_qr_image',
         'aba_account_name',
         'aba_account_number',
     ];
 
     protected $appends = [
+        'shop_logo_url',
+        'logo_url',
         'aba_qr_url',
     ];
+
+    public function getShopLogoUrlAttribute()
+    {
+        return $this->shop_logo
+            ? asset('storage/' . $this->shop_logo)
+            : null;
+    }
+
+    public function getLogoUrlAttribute()
+    {
+        return $this->shop_logo
+            ? asset('storage/' . $this->shop_logo)
+            : null;
+    }
 
     public function getAbaQrUrlAttribute()
     {

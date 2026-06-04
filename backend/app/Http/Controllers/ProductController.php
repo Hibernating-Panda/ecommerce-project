@@ -33,7 +33,7 @@ class ProductController extends Controller
 
     public function show(Request $request, Product $product)
     {
-        $product->load(['category', 'shop'])
+        $product->load(['category', 'shop', 'sizes'])
             ->loadAvg('reviews', 'rating')
             ->loadCount('reviews')
             ->loadSum('orderItems as total_sold', 'quantity');
@@ -90,6 +90,7 @@ class ProductController extends Controller
             'shop' => $product->shop,
             'created_at' => $product->created_at,
             'updated_at' => $product->updated_at,
+            'sizes' => $product->sizes ?? [],
         ];
     }
 

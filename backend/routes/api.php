@@ -28,6 +28,7 @@ use App\Http\Controllers\API\Admin\AdminProductController;
 use App\Http\Controllers\API\Admin\AdminCategoryController;
 use App\Http\Controllers\API\Admin\AdminProfileController;
 use App\Http\Controllers\API\Admin\AdminDeliveryController;
+use App\Http\Controllers\API\PayWayPaymentController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -44,6 +45,8 @@ Route::get('/categories/{id}', [CategoryController::class, 'show']);
 Route::get('/shops', [ShopController::class, 'index']);
 Route::get('/shops/{id}', [ShopController::class, 'show']);
 
+Route::post('/payway/callback', [PayWayPaymentController::class, 'callback']);
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
@@ -57,10 +60,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/cart/{cartItem}', [CartController::class, 'update']);
     Route::delete('/cart/{cartItem}', [CartController::class, 'destroy']);
 
+    Route::put('/orders/{order}/simulate-payment-success', [PayWayPaymentController::class, 'simulateSuccess']);
+    Route::put('/orders/{order}/simulate-payment-failed', [PayWayPaymentController::class, 'simulateFailed']);
+    Route::post('/orders/{order}/payway/checkout', [PayWayPaymentController::class, 'createCheckout']);
+    Route::get('/orders/{order}/payway/check', [PayWayPaymentController::class, 'check']);
+    Route::get('/orders/{order}/payway/check', [PayWayPaymentController::class, 'check']);
+    Route::get('/customer/orders/{order}/track', [CartOrderController::class, 'trackDelivery']);
     Route::get('/customer/orders', [CartOrderController::class, 'customerIndex']);
     Route::post('/orders', [CartOrderController::class, 'store']);
     Route::put('/orders/{order}/cancel', [CartOrderController::class, 'cancel']);
     Route::put('/orders/{order}/checkout', [CartOrderController::class, 'checkout']);
+    Route::post('/orders/{order}/checkout-preview', [CartOrderController::class, 'previewCheckout']);
 
     Route::get('/wishlist', [WishlistController::class, 'index']);
     Route::post('/wishlist/toggle', [WishlistController::class, 'toggle']);
@@ -83,10 +93,10 @@ Route::middleware('auth:sanctum')
         Route::put('/products/{id}', [ShopOwnerController::class, 'updateProduct']);
         Route::delete('/products/{id}', [ShopOwnerController::class, 'deleteProduct']);
 
-        Route::get('/orders', [CartOrderController::class, 'shopOwnerOrders']);
-        Route::put('/order-items/{orderItem}/reject', [CartOrderController::class, 'rejectItem']);
-        Route::put('/order-items/{orderItem}/ready', [CartOrderController::class, 'readyItem']);
-
+        Route::get('/orders', [ShopOwnerController::class, 'orders']);
+        Route::put('/order-items/{orderItem}/accept', [ShopOwnerController::class, 'acceptOrderItem']);
+        Route::put('/order-items/{orderItem}/reject', [ShopOwnerController::class, 'rejectOrderItem']);
+        Route::put('/orders/{order}/ready', [ShopOwnerController::class, 'readyOrder']);
         Route::get('/sales', [ShopOwnerController::class, 'sales']);
 
         Route::get('/profile', [ShopOwnerController::class, 'profile']);

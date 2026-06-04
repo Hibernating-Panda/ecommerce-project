@@ -14,18 +14,38 @@ class DeliveryController extends Controller
         $driverId = $request->user()->id;
 
         return response()->json([
-            'assigned' => Delivery::where('driver_id', $driverId)->where('status', 'assigned')->count(),
-            'delivering' => Delivery::where('driver_id', $driverId)->whereIn('status', ['picked_up', 'in_transit'])->count(),
-            'delivered' => Delivery::where('driver_id', $driverId)->where('status', 'delivered')->count(),
-            'cancelled' => Delivery::where('driver_id', $driverId)->where('status', 'cancelled')->count(),
+            'available' => Delivery::whereNull('driver_id')
+                ->where('status', 'available')
+                ->count(),
+
+            'going_to_shop' => Delivery::where('driver_id', $driverId)
+                ->where('status', 'going_to_shop')
+                ->count(),
+
+            'in_transit' => Delivery::where('driver_id', $driverId)
+                ->where('status', 'in_transit')
+                ->count(),
+
+            'delivered' => Delivery::where('driver_id', $driverId)
+                ->where('status', 'delivered')
+                ->count(),
+
+            'cancelled' => Delivery::where('driver_id', $driverId)
+                ->where('status', 'cancelled')
+                ->count(),
         ]);
     }
 
     public function availableDeliveries(Request $request)
     {
         $deliveries = Delivery::whereNull('driver_id')
-            ->where('status', 'pending')
-            ->with(['order.customer', 'shop', 'orderItems.product'])
+            ->where('status', 'available')
+            ->with([
+                'order.customer',
+                'shop',
+                'orderItems.product',
+                'orderItems.productSize',
+            ])
             ->latest()
             ->paginate($request->integer('per_page', 10));
 
@@ -41,7 +61,7 @@ class DeliveryController extends Controller
         }
 
         $delivery = Delivery::whereNull('driver_id')
-            ->where('status', 'pending')
+            ->where('status', 'available')
             ->find($id);
 
         if (! $delivery) {
@@ -52,25 +72,32 @@ class DeliveryController extends Controller
 
         $delivery->update([
             'driver_id' => $request->user()->id,
-            'status' => 'assigned',
+            'status' => 'going_to_shop',
             'started_at' => now(),
         ]);
 
-        $delivery->order?->update([
-            'status' => 'in_transit',
-        ]);
-
         return response()->json([
-            'message' => 'Delivery task accepted.',
-            'delivery' => $delivery->load(['order.customer', 'shop', 'orderItems.product']),
+            'message' => 'Delivery task accepted. Go to the shop.',
+            'delivery' => $delivery->fresh()->load([
+                'order.customer',
+                'shop',
+                'orderItems.product',
+                'orderItems.productSize',
+            ]),
         ]);
     }
 
     public function assignedDeliveries(Request $request)
     {
         $deliveries = Delivery::where('driver_id', $request->user()->id)
-            ->whereIn('status', ['assigned', 'picked_up', 'in_transit'])
-            ->with(['order.customer', 'shop', 'orderItems.product', 'latestLocation'])
+            ->whereIn('status', ['going_to_shop', 'in_transit'])
+            ->with([
+                'order.customer',
+                'shop',
+                'orderItems.product',
+                'orderItems.productSize',
+                'latestLocation',
+            ])
             ->latest()
             ->paginate($request->integer('per_page', 10));
 
@@ -83,6 +110,7 @@ class DeliveryController extends Controller
                 'order.customer',
                 'shop',
                 'orderItems.product',
+                'orderItems.productSize',
                 'locations',
                 'driver',
             ])
@@ -122,37 +150,109 @@ class DeliveryController extends Controller
             ], 422);
         }
 
-        $data = [
-            'status' => $validated['status'],
-            'notes' => $validated['notes'] ?? $delivery->notes,
-        ];
-
         if ($validated['status'] === 'picked_up') {
-            $data['picked_up_at'] = now();
+            if ($delivery->status !== 'going_to_shop') {
+                return response()->json([
+                    'message' => 'You can only pick up after accepting the task.',
+                ], 422);
+            }
+
+            $delivery->update([
+                'status' => 'in_transit',
+                'picked_up_at' => now(),
+                'notes' => $validated['notes'] ?? $delivery->notes,
+            ]);
+
+            $delivery->order?->update([
+                'status' => 'in_transit',
+            ]);
+
+            return response()->json([
+                'message' => 'Order picked up. Deliver to customer.',
+                'delivery' => $delivery->fresh()->load([
+                    'order.customer',
+                    'shop',
+                    'orderItems.product',
+                    'orderItems.productSize',
+                ]),
+            ]);
         }
 
         if ($validated['status'] === 'in_transit') {
-            $data['started_at'] = $delivery->started_at ?? now();
+            $delivery->update([
+                'status' => 'in_transit',
+                'picked_up_at' => $delivery->picked_up_at ?? now(),
+                'notes' => $validated['notes'] ?? $delivery->notes,
+            ]);
+
+            $delivery->order?->update([
+                'status' => 'in_transit',
+            ]);
+
+            return response()->json([
+                'message' => 'Delivery is now in transit.',
+                'delivery' => $delivery->fresh()->load([
+                    'order.customer',
+                    'shop',
+                    'orderItems.product',
+                    'orderItems.productSize',
+                ]),
+            ]);
         }
 
         if ($validated['status'] === 'delivered') {
-            $data['completed_at'] = now();
+            if ($delivery->status !== 'in_transit') {
+                return response()->json([
+                    'message' => 'Please mark the order as picked up first.',
+                ], 422);
+            }
+
+            $delivery->update([
+                'status' => 'delivered',
+                'completed_at' => now(),
+                'notes' => $validated['notes'] ?? $delivery->notes,
+            ]);
+
+            $this->refreshOrderAfterDelivery($delivery);
+
+            return response()->json([
+                'message' => 'Delivery completed successfully.',
+                'delivery' => $delivery->fresh()->load([
+                    'order.customer',
+                    'shop',
+                    'orderItems.product',
+                    'orderItems.productSize',
+                ]),
+            ]);
         }
 
-        $delivery->update($data);
-        $this->refreshOrderAfterDelivery($delivery);
+        if ($validated['status'] === 'cancelled') {
+            $delivery->update([
+                'status' => 'cancelled',
+                'notes' => $validated['notes'] ?? $delivery->notes,
+            ]);
+
+            return response()->json([
+                'message' => 'Delivery cancelled.',
+                'delivery' => $delivery->fresh()->load([
+                    'order.customer',
+                    'shop',
+                    'orderItems.product',
+                    'orderItems.productSize',
+                ]),
+            ]);
+        }
 
         return response()->json([
-            'message' => 'Delivery status updated successfully.',
-            'delivery' => $delivery->load(['order.customer', 'shop', 'orderItems.product']),
-        ]);
+            'message' => 'Invalid status.',
+        ], 422);
     }
 
     public function updateLocation(Request $request, $id)
     {
         $validated = $request->validate([
-            'latitude' => ['required', 'numeric'],
-            'longitude' => ['required', 'numeric'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
             'address' => ['nullable', 'string'],
         ]);
 
@@ -180,6 +280,7 @@ class DeliveryController extends Controller
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
             'address' => $validated['address'] ?? null,
+            'timestamp' => now(),
         ]);
 
         return response()->json([
@@ -192,7 +293,12 @@ class DeliveryController extends Controller
     {
         $deliveries = Delivery::where('driver_id', $request->user()->id)
             ->whereIn('status', ['delivered', 'cancelled'])
-            ->with(['order.customer', 'shop', 'orderItems.product'])
+            ->with([
+                'order.customer',
+                'shop',
+                'orderItems.product',
+                'orderItems.productSize',
+            ])
             ->orderByDesc('completed_at')
             ->paginate($request->integer('per_page', 10));
 
@@ -239,13 +345,21 @@ class DeliveryController extends Controller
 
         $order->load('deliveries');
 
-        if ($order->deliveries->isNotEmpty() && $order->deliveries->every(fn ($item) => $item->status === 'delivered')) {
-            $order->update(['status' => 'delivered']);
+        if (
+            $order->deliveries->isNotEmpty()
+            && $order->deliveries->every(fn ($item) => $item->status === 'delivered')
+        ) {
+            $order->update([
+                'status' => 'delivered',
+            ]);
+
             return;
         }
 
-        if ($order->deliveries->contains(fn ($item) => in_array($item->status, ['picked_up', 'in_transit']))) {
-            $order->update(['status' => 'in_transit']);
+        if ($order->deliveries->contains(fn ($item) => $item->status === 'in_transit')) {
+            $order->update([
+                'status' => 'in_transit',
+            ]);
         }
     }
 }

@@ -26,7 +26,7 @@ return new class extends Migration
             $table->index(['method', 'status']);
             $table->index('created_at');
         });
-    }
+    } 
 
     public function down(): void
     {

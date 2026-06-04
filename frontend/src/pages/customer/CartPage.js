@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/Navbar";
-import { API_URL, authHeaders } from "../../services/api";
+import api from "../../services/api";
 
 const COLORS = {
   primary: "#E8192C",
@@ -10,6 +10,9 @@ const COLORS = {
   border: "#e5e7eb",
   bg: "#f4f6fb",
   white: "#ffffff",
+  green: "#16a34a",
+  greenDark: "#166534",
+  greenLight: "#dcfce7",
 };
 
 const CartPage = () => {
@@ -17,9 +20,11 @@ const CartPage = () => {
 
   const [cartItems, setCartItems] = useState([]);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [ordering, setOrdering] = useState(false);
 
   useEffect(() => {
-    fetchCart();
+    fetchCart(true);
   }, []);
 
   const showMessage = (text) => {
@@ -27,90 +32,72 @@ const CartPage = () => {
     setTimeout(() => setMessage(""), 2500);
   };
 
-  const fetchCart = async () => {
+  const fetchCart = async (showFullLoading = false) => {
     try {
-      const res = await fetch(`${API_URL}/cart`, {
-        headers: authHeaders(),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to load cart");
+      if (showFullLoading) {
+        setLoading(true);
       }
 
-      setCartItems(data.cart_items || []);
+      const res = await api.get("/cart");
+      setCartItems(res.data.cart_items || res.data.data || []);
     } catch (error) {
-      showMessage(error.message || "Failed to load cart");
+      console.error("Fetch cart error:", error.response?.data || error);
+      showMessage(error.response?.data?.message || "Failed to load cart.");
+    } finally {
+      if (showFullLoading) {
+        setLoading(false);
+      }
     }
   };
 
   const updateQuantity = async (cartItemId, quantity) => {
+    const cleanQuantity = Math.max(1, Number(quantity || 1));
+
     try {
-      const res = await fetch(`${API_URL}/cart/${cartItemId}`, {
-        method: "PUT",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          quantity: Number(quantity),
-        }),
+      await api.put(`/cart/${cartItemId}`, {
+        quantity: cleanQuantity,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to update quantity");
-      }
 
       fetchCart();
     } catch (error) {
-      showMessage(error.message || "Failed to update quantity");
+      console.error("Update quantity error:", error.response?.data || error);
+      showMessage(error.response?.data?.message || "Failed to update quantity.");
     }
   };
 
   const removeItem = async (cartItemId) => {
     try {
-      const res = await fetch(`${API_URL}/cart/${cartItemId}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to remove item");
-      }
+      await api.delete(`/cart/${cartItemId}`);
 
       showMessage("Item removed from cart.");
       fetchCart();
     } catch (error) {
-      showMessage(error.message || "Failed to remove item");
+      console.error("Remove cart item error:", error.response?.data || error);
+      showMessage(error.response?.data?.message || "Failed to remove item.");
     }
   };
 
   const placeOrder = async () => {
     try {
-      const res = await fetch(`${API_URL}/orders`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({}),
-      });
+      setOrdering(true);
 
-      const data = await res.json();
+      const res = await api.post("/orders", {});
 
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to place order");
-      }
-
-      showMessage("Order placed successfully.");
+      showMessage(res.data.message || "Order placed successfully.");
       navigate("/customer/orders");
     } catch (error) {
-      showMessage(error.message || "Failed to place order");
+      console.error("Place order error:", error.response?.data || error);
+      showMessage(error.response?.data?.message || "Failed to place order.");
+    } finally {
+      setOrdering(false);
     }
   };
 
-  const total = cartItems.reduce((sum, item) => {
-    return sum + Number(item.product?.price || 0) * Number(item.quantity || 1);
-  }, 0);
+  const total = useMemo(() => {
+    return cartItems.reduce((sum, item) => {
+      return sum + getCartItemFinalPrice(item) * Number(item.quantity || 1);
+    }, 0);
+  }, [cartItems]);
 
   return (
     <div style={styles.page}>
@@ -125,64 +112,144 @@ const CartPage = () => {
             <p style={styles.subtitle}>Review products before ordering.</p>
           </div>
 
-          <button style={styles.backButton} onClick={() => navigate("/")}>
+          <button
+            type="button"
+            style={styles.backButton}
+            onClick={() => navigate("/")}
+          >
             Continue Shopping
           </button>
         </div>
 
-        {cartItems.length === 0 ? (
+        {loading ? (
+          <div style={styles.emptyCard}>
+            <div style={styles.emptyIcon}>🛒</div>
+            <h2>Loading cart...</h2>
+            <p style={styles.emptyText}>
+              Please wait while we load your products.
+            </p>
+          </div>
+        ) : cartItems.length === 0 ? (
           <div style={styles.emptyCard}>
             <div style={styles.emptyIcon}>🛒</div>
             <h2>Your cart is empty</h2>
             <p style={styles.emptyText}>Add products to cart first.</p>
-            <button style={styles.primaryButton} onClick={() => navigate("/")}>
+
+            <button
+              type="button"
+              style={styles.primaryButton}
+              onClick={() => navigate("/")}
+            >
               Browse Products
             </button>
           </div>
         ) : (
           <div style={styles.grid}>
             <div style={styles.card}>
-              {cartItems.map((item) => (
-                <div key={item.id} style={styles.cartItem}>
-                  <img
-                    src={
-                      item.product?.image_url ||
-                      item.product?.thumbnail ||
-                      item.product?.image ||
-                      "https://via.placeholder.com/100"
-                    }
-                    alt={item.product?.name}
-                    style={styles.image}
-                  />
+              {cartItems.map((item) => {
+                const product = item.product || {};
+                const imageUrl = getProductImage(product);
+                const size = getCartItemSize(item);
 
-                  <div style={{ flex: 1 }}>
-                    <h3 style={styles.productName}>{item.product?.name}</h3>
-                    <p style={styles.price}>
-                      ${Number(item.product?.price || 0).toFixed(2)}
-                    </p>
+                const basePrice = getCartItemBasePrice(item);
+                const finalPrice = getCartItemFinalPrice(item);
+                const hasDiscount = finalPrice < basePrice;
+                const discountPercent = getDiscountPercent(item);
+
+                const itemTotal = finalPrice * Number(item.quantity || 1);
+                const stock = getCartItemStock(item);
+
+                return (
+                  <div key={item.id} style={styles.cartItem}>
+                    <img
+                      src={imageUrl}
+                      alt={product.name || "Product"}
+                      style={styles.image}
+                      onError={(e) => {
+                        e.currentTarget.src = "/no-image.png";
+                      }}
+                    />
+
+                    <div style={styles.productInfo}>
+                      <h3 style={styles.productName}>
+                        {product.name || "Product"}
+                      </h3>
+
+                      {size && (
+                        <div style={styles.sizeRow}>
+                          <span style={styles.sizeLabel}>Size</span>
+                          <span style={styles.sizeChip}>{size}</span>
+                        </div>
+                      )}
+
+                      <p style={styles.price}>
+                        ${finalPrice.toFixed(2)}
+                        {hasDiscount && (
+                          <span style={styles.oldPrice}>
+                            ${basePrice.toFixed(2)}
+                          </span>
+                        )}
+                        {size ? " / selected size" : ""}
+                      </p>
+
+                      {hasDiscount && (
+                        <p style={styles.discountText}>
+                          Discount: -{discountPercent}%
+                        </p>
+                      )}
+
+                      {stock !== null && (
+                        <p style={styles.stockText}>
+                          Stock: {Number(stock).toLocaleString()}
+                        </p>
+                      )}
+
+                      <p style={styles.itemTotal}>
+                        Item total: ${itemTotal.toFixed(2)}
+                      </p>
+                    </div>
+
+                    <div style={styles.quantityBox}>
+                      <label style={styles.qtyLabel}>Qty</label>
+
+                      <input
+                        type="number"
+                        min="1"
+                        max={stock || undefined}
+                        value={item.quantity}
+                        onChange={(e) => updateQuantity(item.id, e.target.value)}
+                        style={styles.qtyInput}
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      style={styles.removeButton}
+                      onClick={() => removeItem(item.id)}
+                    >
+                      Remove
+                    </button>
                   </div>
-
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => updateQuantity(item.id, e.target.value)}
-                    style={styles.qtyInput}
-                  />
-
-                  <button style={styles.removeButton} onClick={() => removeItem(item.id)}>
-                    Remove
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div style={styles.summaryCard}>
               <h2 style={styles.summaryTitle}>Order Summary</h2>
 
               <div style={styles.summaryRow}>
+                <span>Items</span>
+                <strong>{cartItems.length}</strong>
+              </div>
+
+              <div style={styles.summaryRow}>
                 <span>Subtotal</span>
                 <strong>${total.toFixed(2)}</strong>
+              </div>
+
+              <div style={styles.summaryNote}>
+                Delivery fee will be calculated on the order checkout page after
+                you pick the delivery location.
               </div>
 
               <div style={styles.summaryRow}>
@@ -190,8 +257,17 @@ const CartPage = () => {
                 <strong style={styles.total}>${total.toFixed(2)}</strong>
               </div>
 
-              <button style={styles.primaryButton} onClick={placeOrder}>
-                Order
+              <button
+                type="button"
+                style={{
+                  ...styles.primaryButton,
+                  opacity: ordering ? 0.7 : 1,
+                  cursor: ordering ? "not-allowed" : "pointer",
+                }}
+                disabled={ordering}
+                onClick={placeOrder}
+              >
+                {ordering ? "Ordering..." : "Order"}
               </button>
             </div>
           </div>
@@ -200,6 +276,124 @@ const CartPage = () => {
     </div>
   );
 };
+
+function getApiBaseUrl() {
+  const baseUrl = api.defaults.baseURL || "http://127.0.0.1:8000/api";
+  return baseUrl.replace(/\/api\/?$/, "");
+}
+
+function normalizeImageUrl(image) {
+  if (!image) return "/no-image.png";
+
+  if (
+    String(image).startsWith("http://") ||
+    String(image).startsWith("https://")
+  ) {
+    return image;
+  }
+
+  if (String(image).startsWith("/storage/")) {
+    return `${getApiBaseUrl()}${image}`;
+  }
+
+  if (String(image).startsWith("storage/")) {
+    return `${getApiBaseUrl()}/${image}`;
+  }
+
+  return `${getApiBaseUrl()}/storage/${image}`;
+}
+
+function getProductImage(product) {
+  return normalizeImageUrl(
+    product?.image_url ||
+      product?.thumbnail ||
+      product?.image ||
+      product?.photo ||
+      ""
+  );
+}
+
+function getCartItemSize(item) {
+  return (
+    item?.product_size?.size ||
+    item?.productSize?.size ||
+    item?.size ||
+    item?.selected_size ||
+    item?.product_size_name ||
+    ""
+  );
+}
+
+function getCartItemBasePrice(item) {
+  if (item?.base_price !== undefined && item?.base_price !== null) {
+    return Number(item.base_price);
+  }
+
+  return Number(
+    item?.product_size?.price ||
+      item?.productSize?.price ||
+      item?.size_price ||
+      item?.selected_size_price ||
+      item?.product?.price ||
+      item?.price ||
+      0
+  );
+}
+
+function getCartItemFinalPrice(item) {
+  if (item?.unit_price !== undefined && item?.unit_price !== null) {
+    return Number(item.unit_price);
+  }
+
+  if (item?.price !== undefined && item?.price !== null) {
+    return Number(item.price);
+  }
+
+  return getDiscountedPrice(item?.product, getCartItemBasePrice(item));
+}
+
+function getDiscountPercent(item) {
+  return Number(item?.discount_percent || item?.product?.discount_percent || 0);
+}
+
+function getDiscountedPrice(product, basePrice) {
+  const price = Number(basePrice || 0);
+  const discountPercent = Number(product?.discount_percent || 0);
+
+  if (discountPercent <= 0) {
+    return price;
+  }
+
+  const now = new Date();
+
+  if (product?.discount_start && new Date(product.discount_start) > now) {
+    return price;
+  }
+
+  if (product?.discount_end && new Date(product.discount_end) < now) {
+    return price;
+  }
+
+  return Math.max(price - price * (discountPercent / 100), 0);
+}
+
+function getCartItemStock(item) {
+  const sizeStock =
+    item?.product_size?.stock ||
+    item?.productSize?.stock ||
+    item?.size_stock ||
+    item?.selected_size_stock;
+
+  if (sizeStock !== undefined && sizeStock !== null) {
+    return Number(sizeStock);
+  }
+
+  if (item?.product?.stock !== undefined && item?.product?.stock !== null) {
+    return Number(item.product.stock);
+  }
+
+  return null;
+}
 
 const styles = {
   page: {
@@ -231,6 +425,7 @@ const styles = {
     gap: 16,
     alignItems: "center",
     marginBottom: 22,
+    flexWrap: "wrap",
   },
 
   title: {
@@ -256,8 +451,9 @@ const styles = {
 
   grid: {
     display: "grid",
-    gridTemplateColumns: "1fr 320px",
+    gridTemplateColumns: "minmax(0, 1fr) 320px",
     gap: 22,
+    alignItems: "start",
   },
 
   card: {
@@ -273,6 +469,7 @@ const styles = {
     gap: 16,
     borderBottom: "1px solid #f1f1f1",
     padding: "14px 0",
+    flexWrap: "wrap",
   },
 
   image: {
@@ -281,6 +478,12 @@ const styles = {
     objectFit: "cover",
     borderRadius: 14,
     background: "#f9fafb",
+    flexShrink: 0,
+  },
+
+  productInfo: {
+    flex: 1,
+    minWidth: 220,
   },
 
   productName: {
@@ -288,9 +491,75 @@ const styles = {
     color: COLORS.dark,
   },
 
+  sizeRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+    flexWrap: "wrap",
+  },
+
+  sizeLabel: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: 900,
+    textTransform: "uppercase",
+  },
+
+  sizeChip: {
+    background: COLORS.greenLight,
+    color: COLORS.greenDark,
+    border: "1px solid #bbf7d0",
+    borderRadius: 999,
+    padding: "3px 9px",
+    fontSize: 12,
+    fontWeight: 900,
+  },
+
   price: {
-    margin: "5px 0 0",
+    margin: "7px 0 0",
     color: COLORS.primary,
+    fontWeight: 900,
+  },
+
+  oldPrice: {
+    color: COLORS.muted,
+    textDecoration: "line-through",
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: 700,
+  },
+
+  discountText: {
+    margin: "5px 0 0",
+    color: COLORS.greenDark,
+    fontWeight: 800,
+    fontSize: 13,
+  },
+
+  stockText: {
+    margin: "5px 0 0",
+    color: COLORS.muted,
+    fontWeight: 700,
+    fontSize: 13,
+  },
+
+  itemTotal: {
+    margin: "5px 0 0",
+    color: COLORS.dark,
+    fontWeight: 800,
+    fontSize: 13,
+  },
+
+  quantityBox: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+
+  qtyLabel: {
+    color: COLORS.muted,
+    fontSize: 12,
     fontWeight: 900,
   },
 
@@ -330,6 +599,18 @@ const styles = {
     color: COLORS.dark,
   },
 
+  summaryNote: {
+    background: "#f9fafb",
+    border: `1px solid ${COLORS.border}`,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+    color: COLORS.muted,
+    fontSize: 13,
+    fontWeight: 700,
+    lineHeight: 1.5,
+  },
+
   total: {
     color: COLORS.primary,
     fontSize: 22,
@@ -360,25 +641,6 @@ const styles = {
     borderRadius: 12,
     fontWeight: 900,
     cursor: "pointer",
-  },
-
-  paymentBox: {
-    margin: "16px 0",
-  },
-
-  paymentLabel: {
-    display: "block",
-    marginBottom: 8,
-    fontWeight: 800,
-    color: COLORS.dark,
-  },
-
-  paymentSelect: {
-    width: "100%",
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 12,
-    padding: "11px",
-    fontWeight: 700,
   },
 };
 

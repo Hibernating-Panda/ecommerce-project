@@ -13,7 +13,7 @@ class Delivery extends Model
         'order_id',
         'shop_id',
         'driver_id',
-        'status',
+        'status', 
         'pickup_location',
         'delivery_location',
         'pickup_lat',

@@ -1,18 +1,111 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { roleThemes } from "../../theme/roleThemes";
 
 export default function AdminLayout() {
   const theme = roleThemes.admin;
-  const { logout, user } = useAuth();
+  const { logout, user, updateAuthUser } = useAuth();
   const navigate = useNavigate();
+
   const [open, setOpen] = useState(false);
+  const [layoutUser, setLayoutUser] = useState(user);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    const styleId = "admin-layout-responsive-style";
+
+    if (document.getElementById(styleId)) return;
+
+    const responsiveStyle = document.createElement("style");
+    responsiveStyle.id = styleId;
+    responsiveStyle.innerHTML = `
+      @media (max-width: 900px) {
+        .admin-mobile-menu-button {
+          display: flex !important;
+        }
+
+        .admin-sidebar {
+          transform: translateX(-100%);
+        }
+
+        .admin-sidebar.admin-sidebar-open {
+          transform: translateX(0);
+        }
+
+        .admin-main-content {
+          margin-left: 0 !important;
+          padding-top: 58px !important;
+        }
+      }
+    `;
+
+    document.head.appendChild(responsiveStyle);
+  }, []);
+
+  useEffect(() => {
+    setLayoutUser(user);
+  }, [user]);
+
+  useEffect(() => {
+    fetchFreshProfile();
+  }, []);
+
+  const fetchFreshProfile = async () => {
+    try {
+      const res = await api.get("/admin/profile");
+      const freshUser = res.data.user || res.data;
+
+      setLayoutUser(freshUser);
+      setImageError(false);
+
+      if (typeof updateAuthUser === "function") {
+        updateAuthUser(freshUser);
+      }
+
+      localStorage.setItem("user", JSON.stringify(freshUser));
+    } catch (error) {
+      console.log(
+        "Admin layout profile refresh error:",
+        error.response?.data || error
+      );
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
-    navigate("/login");
+    navigate("/");
   };
+
+  const getApiBaseUrl = () => {
+    const baseUrl = api.defaults.baseURL || "http://127.0.0.1:8000/api";
+    return baseUrl.replace(/\/api\/?$/, "");
+  };
+
+  const normalizeImageUrl = (image) => {
+    if (!image) return "";
+
+    if (image.startsWith("http://") || image.startsWith("https://")) {
+      return image;
+    }
+
+    if (image.startsWith("/storage/")) {
+      return `${getApiBaseUrl()}${image}`;
+    }
+
+    if (image.startsWith("storage/")) {
+      return `${getApiBaseUrl()}/${image}`;
+    }
+
+    return `${getApiBaseUrl()}/storage/${image}`;
+  };
+
+  const profileImageSrc = useMemo(() => {
+    return normalizeImageUrl(
+      layoutUser?.profile_image_url || layoutUser?.profile_image || ""
+    );
+  }, [layoutUser]);
 
   const navItems = [
     { label: "Dashboard", path: "/admin/dashboard", icon: "📊", end: true },
@@ -20,12 +113,14 @@ export default function AdminLayout() {
     { label: "Products", path: "/admin/products", icon: "📦" },
     { label: "Deliveries", path: "/admin/deliveries", icon: "🚚" },
     { label: "Categories", path: "/admin/categories", icon: "🏷️" },
+    { label: "Profile", path: "/admin/profile", icon: "👤" },
   ];
 
   return (
     <div style={{ ...styles.wrapper, backgroundColor: theme.bg }}>
       <button
         type="button"
+        className="admin-mobile-menu-button"
         style={{ ...styles.menuButton, backgroundColor: theme.primary }}
         onClick={() => setOpen(true)}
       >
@@ -35,9 +130,9 @@ export default function AdminLayout() {
       {open && <div style={styles.overlay} onClick={() => setOpen(false)} />}
 
       <aside
+        className={`admin-sidebar ${open ? "admin-sidebar-open" : ""}`}
         style={{
           ...styles.sidebar,
-          transform: open ? "translateX(0)" : undefined,
           background: `linear-gradient(180deg, ${theme.primaryDark}, #111827)`,
         }}
       >
@@ -66,19 +161,31 @@ export default function AdminLayout() {
                 : {}),
             })}
           >
-            <div style={{ ...styles.avatar, backgroundColor: theme.primaryLight, color: theme.primaryDark }}>
-              {user?.profile_image ? (
-                <img src={user.profile_image} alt={user.name} style={styles.avatarImage} />
-              ) : user?.name ? (
-                user.name.charAt(0).toUpperCase()
+            <div
+              style={{
+                ...styles.avatar,
+                backgroundColor: theme.primaryLight,
+                color: theme.primaryDark,
+              }}
+            >
+              {profileImageSrc && !imageError ? (
+                <img
+                  key={profileImageSrc}
+                  src={profileImageSrc}
+                  alt={layoutUser?.name || "Admin"}
+                  style={styles.avatarImage}
+                  onError={() => setImageError(true)}
+                />
+              ) : layoutUser?.name ? (
+                layoutUser.name.charAt(0).toUpperCase()
               ) : (
                 "A"
               )}
             </div>
 
             <div style={styles.userText}>
-              <p style={styles.userName}>{user?.name || "Admin"}</p>
-              <p style={styles.userRole}>{user?.role || "admin"}</p>
+              <p style={styles.userName}>{layoutUser?.name || "Admin"}</p>
+              <p style={styles.userRole}>{layoutUser?.role || "admin"}</p>
             </div>
           </NavLink>
 
@@ -108,14 +215,14 @@ export default function AdminLayout() {
         </div>
 
         <div style={styles.bottomSection}>
-          <button onClick={handleLogout} style={styles.logoutButton}>
+          <button type="button" onClick={handleLogout} style={styles.logoutButton}>
             <span style={styles.navIcon}>🚪</span>
             <span>Logout</span>
           </button>
         </div>
       </aside>
 
-      <main style={styles.mainContent}>
+      <main className="admin-main-content" style={styles.mainContent}>
         <Outlet />
       </main>
     </div>
@@ -127,6 +234,7 @@ const styles = {
     minHeight: "100vh",
     width: "100%",
   },
+
   menuButton: {
     display: "none",
     position: "fixed",
@@ -134,20 +242,24 @@ const styles = {
     left: 16,
     zIndex: 1100,
     border: "none",
-    color: "white",
+    color: "#ffffff",
     width: 44,
     height: 44,
     borderRadius: 12,
     fontSize: 22,
     fontWeight: 900,
     cursor: "pointer",
+    alignItems: "center",
+    justifyContent: "center",
   },
+
   overlay: {
     position: "fixed",
     inset: 0,
     backgroundColor: "rgba(15, 23, 42, 0.45)",
     zIndex: 999,
   },
+
   sidebar: {
     position: "fixed",
     top: 0,
@@ -165,12 +277,14 @@ const styles = {
     overflowY: "auto",
     transition: "transform 0.25s ease",
   },
+
   brandBox: {
     display: "flex",
     alignItems: "center",
     gap: 12,
     marginBottom: 28,
   },
+
   logo: {
     width: 44,
     height: 44,
@@ -182,31 +296,37 @@ const styles = {
     fontWeight: 900,
     boxShadow: "0 8px 18px rgba(220,38,38,0.35)",
   },
+
   brandTitle: {
     margin: 0,
     fontSize: 22,
     fontWeight: 900,
   },
+
   brandSubtitle: {
     margin: "4px 0 0",
     fontSize: 13,
     color: "#fecaca",
   },
+
   userBox: {
     display: "flex",
     alignItems: "center",
     gap: 12,
     backgroundColor: "rgba(255,255,255,0.08)",
-    border: "1px solid rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 16,
     padding: 14,
     marginBottom: 24,
     textDecoration: "none",
     color: "#ffffff",
   },
+
   avatar: {
-    width: 42,
-    height: 42,
+    width: 52,
+    height: 52,
     borderRadius: "50%",
     display: "flex",
     alignItems: "center",
@@ -216,14 +336,18 @@ const styles = {
     overflow: "hidden",
     flexShrink: 0,
   },
+
   avatarImage: {
     width: "100%",
     height: "100%",
     objectFit: "cover",
+    display: "block",
   },
+
   userText: {
     minWidth: 0,
   },
+
   userName: {
     margin: 0,
     fontSize: 15,
@@ -232,17 +356,20 @@ const styles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
+
   userRole: {
     margin: "4px 0 0",
     fontSize: 12,
     color: "#fca5a5",
     textTransform: "capitalize",
   },
+
   nav: {
     display: "flex",
     flexDirection: "column",
     gap: 8,
   },
+
   navLink: {
     display: "flex",
     alignItems: "center",
@@ -254,18 +381,23 @@ const styles = {
     fontSize: 15,
     fontWeight: 700,
   },
+
   navIcon: {
     width: 22,
     display: "inline-flex",
     justifyContent: "center",
   },
+
   bottomSection: {
     display: "flex",
     flexDirection: "column",
     gap: 10,
     paddingTop: 18,
-    borderTop: "1px solid rgba(255,255,255,0.12)",
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: "rgba(255,255,255,0.12)",
   },
+
   logoutButton: {
     display: "flex",
     alignItems: "center",
@@ -280,28 +412,10 @@ const styles = {
     cursor: "pointer",
     textAlign: "left",
   },
+
   mainContent: {
     marginLeft: 260,
     minHeight: "100vh",
     boxSizing: "border-box",
   },
 };
-
-const responsiveStyle = document.createElement("style");
-responsiveStyle.innerHTML = `
-  @media (max-width: 900px) {
-    button[style] {
-      display: block !important;
-    }
-
-    aside[style] {
-      transform: translateX(-100%);
-    }
-
-    main[style] {
-      margin-left: 0 !important;
-      padding-top: 58px !important;
-    }
-  }
-`;
-document.head.appendChild(responsiveStyle);

@@ -29,15 +29,21 @@ import DeliveryDashboard from "./pages/delivery/DashboardDelivery";
 import DeliveryOrders from "./pages/delivery/DeliveryOrders";
 import DeliveryHistory from "./pages/delivery/DeliveryHistory";
 import DeliveryProfile from "./pages/delivery/DeliveryProfile";
+import DeliveryHome from "./pages/delivery/DeliveryHome";
 
-import CustomerDashboard from "./pages/customer/DashboardPage";
+import CustomerDashboard from "./pages/customer/CustomerDashboard";
 import CustomerOrdersPage from "./pages/customer/CustomerOrdersPage";
 import CustomerWishlistPage from "./pages/customer/CustomerWishlistPage";
 import CustomerReviewsPage from "./pages/customer/CustomerReviewsPage";
 import CustomerProfilePage from "./pages/customer/CustomerProfilePage";
 import CustomerSettingsPage from "./pages/customer/CustomerSettingsPage";
 import ProductDetailPage from "./pages/customer/ProductDetailPage";
+import ShopDetailPage from "./pages/customer/ShopDetailPage";
 import CartPage from "./pages/customer/CartPage";
+import CustomerOrderHistoryPage from "./pages/customer/CustomerOrderHistoryPage";
+import TrackDeliveryPage from "./pages/customer/TrackDeliveryPage";
+
+import "leaflet/dist/leaflet.css";
 
 function App() {
   return (
@@ -48,7 +54,10 @@ function App() {
           <Route path="/login" element={<HomePage />} />
           <Route path="/register" element={<HomePage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+
           <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/shop/:id" element={<ShopDetailPage />} />
+          <Route path="/store/:id" element={<ShopDetailPage />} />
 
           <Route
             path="/admin"
@@ -94,12 +103,12 @@ function App() {
             }
           >
             <Route index element={<DeliveryOrders />} />
-            <Route path="dashboard" element={<DeliveryOrders />} />
+            <Route path="dashboard" element={<DeliveryHome />} />
             <Route path="orders" element={<DeliveryOrders />} />
             <Route path="history" element={<DeliveryHistory />} />
             <Route path="profile" element={<DeliveryProfile />} />
           </Route>
-
+ 
           <Route element={<CustomerProtectedRoute />}>
             <Route path="/customer/dashboard" element={<CustomerDashboard />} />
             <Route path="/customer/orders" element={<CustomerOrdersPage />} />
@@ -108,6 +117,8 @@ function App() {
             <Route path="/customer/profile" element={<CustomerProfilePage />} />
             <Route path="/customer/settings" element={<CustomerSettingsPage />} />
             <Route path="/customer/cart" element={<CartPage />} />
+            <Route path="/customer/orders/:id/track" element={<TrackDeliveryPage />} />
+            <Route path="/customer/order-history" element={<CustomerOrderHistoryPage />} />
           </Route>
 
           <Route path="/shop" element={<RoleRedirect />} />

@@ -17,10 +17,13 @@ class OrderController extends Controller
     {
         $orders = Order::with([
                 'items.product',
+                'items.productSize',
                 'items.shop',
                 'delivery.shop',
                 'delivery.driver',
-                'delivery.orderItems.product',
+                'deliveries.shop',
+                'deliveries.driver',
+                'payment',
             ])
             ->where('customer_id', $request->user()->id)
             ->latest()
@@ -45,7 +48,11 @@ class OrderController extends Controller
             ], 422);
         }
 
-        $cartItems = CartItem::with('product.shop')
+        $cartItems = CartItem::with([
+                'product.shop',
+                'product.category',
+                'productSize',
+            ])
             ->where('user_id', $user->id)
             ->get();
 
@@ -65,30 +72,50 @@ class OrderController extends Controller
             ], 422);
         }
 
+        foreach ($cartItems as $item) {
+            $availableStock = $item->productSize
+                ? (int) $item->productSize->stock
+                : (int) $item->product->stock;
+
+            if ($availableStock < (int) $item->quantity) {
+                return response()->json([
+                    'message' => 'Not enough stock available for ' . $item->product->name . '.',
+                ], 422);
+            }
+        }
+
         $order = DB::transaction(function () use ($user, $cartItems) {
             $orderTotal = $cartItems->sum(function ($item) {
-                return (float) $item->product->price * (int) $item->quantity;
+                $price = $this->cartItemPrice($item);
+
+                return $price * (int) $item->quantity;
             });
 
             $order = Order::create([
                 'customer_id' => $user->id,
                 'customer_name' => $user->name,
                 'delivery_address' => $user->address,
+                'delivery_lat' => $user->latitude ?? null,
+                'delivery_lng' => $user->longitude ?? null,
                 'payment_method' => 'cash',
                 'order_type' => null,
                 'pickup_date' => null,
                 'status' => 'pending',
+                'subtotal' => $orderTotal,
+                'delivery_distance_km' => 0,
+                'delivery_fee' => 0,
                 'total' => $orderTotal,
                 'order_date' => now(),
             ]);
 
             foreach ($cartItems as $item) {
-                $price = (float) $item->product->price;
+                $price = $this->cartItemPrice($item);
                 $quantity = (int) $item->quantity;
 
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $item->product_id,
+                    'product_size_id' => $item->product_size_id,
                     'shop_id' => $item->product->shop_id,
                     'quantity' => $quantity,
                     'price' => $price,
@@ -101,7 +128,9 @@ class OrderController extends Controller
 
             return $order->load([
                 'items.product',
+                'items.productSize',
                 'items.shop',
+                'payment',
             ]);
         });
 
@@ -128,6 +157,9 @@ class OrderController extends Controller
         DB::transaction(function () use ($order) {
             $order->update([
                 'status' => 'cancelled',
+                'subtotal' => 0,
+                'delivery_distance_km' => 0,
+                'delivery_fee' => 0,
                 'total' => 0,
             ]);
 
@@ -140,17 +172,81 @@ class OrderController extends Controller
                 'status' => 'cancelled',
                 'notes' => DB::raw("CONCAT(COALESCE(notes, ''), ' Cancelled because customer cancelled the order.')"),
             ]);
+
+            $order->payment?->update([
+                'status' => 'cancelled',
+            ]);
         });
 
         return response()->json([
             'message' => 'Order cancelled successfully.',
-            'order' => $order->load([
+            'order' => $order->fresh()->load([
                 'items.product',
+                'items.productSize',
                 'items.shop',
+                'delivery.shop',
+                'delivery.driver',
                 'deliveries.shop',
                 'deliveries.driver',
-                'deliveries.orderItems.product',
+                'payment',
             ]),
+        ]);
+    }
+
+    public function previewCheckout(Request $request, Order $order)
+    {
+        if ($order->customer_id !== $request->user()->id) {
+            return response()->json([
+                'message' => 'Unauthorized.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'order_type' => ['required', 'in:pickup,delivery'],
+            'delivery_address' => ['required_if:order_type,delivery', 'nullable', 'string', 'max:1000'],
+            'delivery_lat' => ['required_if:order_type,delivery', 'nullable', 'numeric', 'between:-90,90'],
+            'delivery_lng' => ['required_if:order_type,delivery', 'nullable', 'numeric', 'between:-180,180'],
+            'pickup_date' => ['nullable', 'date'],
+        ]);
+
+        $order->load([
+            'items.shop',
+            'items.product',
+            'items.productSize',
+        ]);
+
+        $activeItems = $order->items->where('status', '!=', 'rejected');
+
+        if ($activeItems->isEmpty()) {
+            return response()->json([
+                'message' => 'This order has no active products.',
+            ], 422);
+        }
+
+        $subtotal = round((float) $activeItems->sum('total'), 2);
+
+        if ($validated['order_type'] === 'pickup') {
+            return response()->json([
+                'subtotal' => $subtotal,
+                'delivery_distance_km' => 0,
+                'delivery_fee' => 0,
+                'total' => $subtotal,
+                'delivery_details' => [],
+            ]);
+        }
+
+        $delivery = $this->calculateDeliveryFee(
+            $activeItems,
+            (float) $validated['delivery_lat'],
+            (float) $validated['delivery_lng']
+        );
+
+        return response()->json([
+            'subtotal' => $subtotal,
+            'delivery_distance_km' => $delivery['distance_km'],
+            'delivery_fee' => $delivery['fee'],
+            'total' => round($subtotal + $delivery['fee'], 2),
+            'delivery_details' => $delivery['details'],
         ]);
     }
 
@@ -166,13 +262,28 @@ class OrderController extends Controller
             'order_type' => ['required', 'in:pickup,delivery'],
             'payment_method' => ['required_if:order_type,delivery', 'nullable', 'in:cash,online'],
             'pickup_date' => ['required_if:order_type,pickup', 'nullable', 'date', 'after_or_equal:today'],
+            'delivery_address' => ['required_if:order_type,delivery', 'nullable', 'string', 'max:1000'],
+            'delivery_lat' => ['required_if:order_type,delivery', 'nullable', 'numeric', 'between:-90,90'],
+            'delivery_lng' => ['required_if:order_type,delivery', 'nullable', 'numeric', 'between:-180,180'],
         ]);
 
-        $order->load(['items.shop', 'items.product', 'customer']);
+        $order->load([
+            'items.shop',
+            'items.product',
+            'items.productSize',
+            'customer',
+            'payment',
+        ]);
 
-        if (in_array($order->status, ['cancelled', 'delivered', 'completed', 'in_transit'])) {
+        if (! in_array($order->status, ['pending', 'partially_rejected'])) {
             return response()->json([
-                'message' => 'This order can no longer be checked out.',
+                'message' => 'This order has already been checked out.',
+            ], 422);
+        }
+
+        if ($order->order_type && (float) $order->total > 0 && $order->payment_method) {
+            return response()->json([
+                'message' => 'This order has already been checked out.',
             ], 422);
         }
 
@@ -184,23 +295,92 @@ class OrderController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($order, $validated, $activeItems) {
+        $subtotal = round((float) $activeItems->sum('total'), 2);
+        $deliveryDistanceKm = 0;
+        $deliveryFee = 0;
+        $deliveryDetails = [];
+
+        if ($validated['order_type'] === 'delivery') {
+            $delivery = $this->calculateDeliveryFee(
+                $activeItems,
+                (float) $validated['delivery_lat'],
+                (float) $validated['delivery_lng']
+            );
+
+            $deliveryDistanceKm = $delivery['distance_km'];
+            $deliveryFee = $delivery['fee'];
+            $deliveryDetails = $delivery['details'];
+        }
+
+        DB::transaction(function () use (
+            $order,
+            $validated,
+            $subtotal,
+            $deliveryDistanceKm,
+            $deliveryFee
+        ) {
+            $paymentMethod = $validated['order_type'] === 'delivery'
+                ? $validated['payment_method']
+                : 'cash';
+
             $order->update([
                 'status' => $validated['order_type'] === 'pickup'
                     ? 'accepted'
                     : 'ready_for_delivery',
-                'total' => $activeItems->sum('total'),
+                'subtotal' => $subtotal,
+                'delivery_distance_km' => $deliveryDistanceKm,
+                'delivery_fee' => $deliveryFee,
+                'total' => round($subtotal + $deliveryFee, 2),
                 'order_type' => $validated['order_type'],
-                'payment_method' => $validated['order_type'] === 'delivery'
-                    ? $validated['payment_method']
-                    : 'cash',
+                'payment_method' => $paymentMethod,
                 'pickup_date' => $validated['order_type'] === 'pickup'
                     ? $validated['pickup_date']
                     : null,
+                'delivery_address' => $validated['order_type'] === 'delivery'
+                    ? $validated['delivery_address']
+                    : $order->delivery_address,
+                'delivery_lat' => $validated['order_type'] === 'delivery'
+                    ? $validated['delivery_lat']
+                    : null,
+                'delivery_lng' => $validated['order_type'] === 'delivery'
+                    ? $validated['delivery_lng']
+                    : null,
             ]);
 
+            if ($paymentMethod === 'online') {
+                $order->payment()->updateOrCreate(
+                    [
+                        'order_id' => $order->id,
+                    ],
+                    [
+                        'customer_id' => $order->customer_id,
+                        'amount' => round($subtotal + $deliveryFee, 2),
+                        'currency' => config('payway.currency', 'USD'),
+                        'method' => 'online',
+                        'provider' => 'aba_payway',
+                        'status' => 'pending',
+                    ]
+                );
+            }
+
+            if ($paymentMethod === 'cash') {
+                $order->payment()->updateOrCreate(
+                    [
+                        'order_id' => $order->id,
+                    ],
+                    [
+                        'customer_id' => $order->customer_id,
+                        'amount' => round($subtotal + $deliveryFee, 2),
+                        'currency' => config('payway.currency', 'USD'),
+                        'method' => 'cash',
+                        'provider' => 'cash',
+                        'status' => 'pending',
+                    ]
+                );
+            }
+
             if ($validated['order_type'] === 'delivery') {
-                $this->createDeliveryTasksForOrder($order);
+                $this->createDeliveryTasksForOrder($order->fresh());
             } else {
                 $order->deliveries()->update([
                     'status' => 'cancelled',
@@ -213,257 +393,248 @@ class OrderController extends Controller
             'message' => $validated['order_type'] === 'pickup'
                 ? 'Pickup checkout completed.'
                 : 'Delivery checkout completed.',
-            'order' => $order->load([
+            'subtotal' => $subtotal,
+            'delivery_distance_km' => $deliveryDistanceKm,
+            'delivery_fee' => $deliveryFee,
+            'total' => round($subtotal + $deliveryFee, 2),
+            'delivery_details' => $deliveryDetails,
+            'order' => $order->fresh()->load([
                 'items.product',
+                'items.productSize',
                 'items.shop',
+                'delivery.shop',
+                'delivery.driver',
                 'deliveries.shop',
                 'deliveries.driver',
-                'deliveries.orderItems.product',
+                'payment',
             ]),
         ]);
     }
 
-    public function shopOwnerOrders(Request $request)
+    public function trackDelivery(Request $request, Order $order)
     {
-        $shop = $request->user()->shop;
-
-        if (! $shop) {
-            return response()->json([
-                'message' => 'Shop not found for this owner.',
-            ], 404);
-        }
-
-        $items = OrderItem::with([
-                'order.customer',
-                'order.deliveries.driver',
-                'product',
-            ])
-            ->where('shop_id', $shop->id)
-            ->latest()
-            ->paginate($request->integer('per_page', 15));
-
-        return response()->json($items);
-    }
-
-    public function rejectItem(Request $request, OrderItem $orderItem)
-    {
-        $shop = $request->user()->shop;
-
-        if (! $shop || $orderItem->shop_id !== $shop->id) {
+        if ($order->customer_id !== $request->user()->id) {
             return response()->json([
                 'message' => 'Unauthorized.',
             ], 403);
         }
 
-        $order = $orderItem->order;
-
-        if ($order && in_array($order->status, ['delivered', 'completed', 'in_transit'])) {
-            return response()->json([
-                'message' => 'This product can no longer be rejected.',
-            ], 422);
-        }
-
-        if ($orderItem->status === 'rejected') {
-            return response()->json([
-                'message' => 'This product is already rejected.',
-            ], 422);
-        }
-
-        $validated = $request->validate([
-            'reject_reason' => ['required', 'string', 'max:1000'],
+        $order->load([
+            'customer',
+            'items.product',
+            'items.productSize',
+            'items.shop',
+            'deliveries.shop',
+            'deliveries.driver',
+            'deliveries.latestLocation',
+            'deliveries.orderItems.product',
+            'deliveries.orderItems.productSize',
+            'payment',
         ]);
 
-        DB::transaction(function () use ($orderItem, $validated) {
-            $orderItem->update([
-                'status' => 'rejected',
-                'reject_reason' => $validated['reject_reason'],
+        $delivery = $order->deliveries
+            ->whereNotIn('status', ['cancelled'])
+            ->sortByDesc('id')
+            ->first();
+
+        if (! $delivery) {
+            return response()->json([
+                'order' => $order,
+                'delivery' => null,
+                'message' => 'No delivery task has been created for this order yet.',
             ]);
+        }
 
-            $this->removeRejectedItemFromDelivery($orderItem);
+        $latestLocation = $delivery->latestLocation;
 
-            if ($orderItem->order) {
-                $this->refreshOrderStatus($orderItem->order);
+        $driverLat = $delivery->current_lat ?: $latestLocation?->latitude;
+        $driverLng = $delivery->current_lng ?: $latestLocation?->longitude;
+
+        return response()->json([
+            'order' => $order,
+            'delivery' => $delivery,
+            'tracking' => [
+                'status' => $delivery->status,
+                'pickup' => [
+                    'label' => 'Shop Pickup',
+                    'address' => $delivery->pickup_location,
+                    'lat' => $delivery->pickup_lat,
+                    'lng' => $delivery->pickup_lng,
+                ],
+                'destination' => [
+                    'label' => 'Customer Address',
+                    'address' => $delivery->delivery_location,
+                    'lat' => $delivery->delivery_lat,
+                    'lng' => $delivery->delivery_lng,
+                ],
+                'driver' => [
+                    'label' => $delivery->driver?->name ?? 'Delivery Man',
+                    'phone' => $delivery->driver?->phone,
+                    'lat' => $driverLat,
+                    'lng' => $driverLng,
+                    'updated_at' => $latestLocation?->timestamp ?? $delivery->updated_at,
+                ],
+            ],
+        ]);
+    }
+
+    private function cartItemPrice(CartItem $item): float
+    {
+        $basePrice = $item->productSize
+            ? (float) $item->productSize->price
+            : (float) ($item->product?->price ?? 0);
+
+        return $this->discountedPrice($item->product, $basePrice);
+    }
+
+    private function discountedPrice($product, float $basePrice): float
+    {
+        if (! $product) {
+            return round($basePrice, 2);
+        }
+
+        $discountPercent = (float) ($product->discount_percent ?? 0);
+
+        if ($discountPercent <= 0) {
+            return round($basePrice, 2);
+        }
+
+        $discountStart = $product->discount_start;
+        $discountEnd = $product->discount_end;
+
+        if ($discountStart && now()->lt($discountStart)) {
+            return round($basePrice, 2);
+        }
+
+        if ($discountEnd && now()->gt($discountEnd)) {
+            return round($basePrice, 2);
+        }
+
+        $discounted = $basePrice - ($basePrice * ($discountPercent / 100));
+
+        return round(max($discounted, 0), 2);
+    }
+
+    private function calculateDeliveryFee($activeItems, float $deliveryLat, float $deliveryLng): array
+    {
+        $baseFee = 1.00;
+        $pricePerKm = 0.50;
+        $minimumFeePerShop = 1.50;
+
+        $details = [];
+        $totalDistance = 0;
+        $totalFee = 0;
+
+        $shopGroups = $activeItems->groupBy('shop_id');
+
+        foreach ($shopGroups as $shopId => $items) {
+            $shop = $items->first()->shop;
+
+            if (! $shop || ! $shop->latitude || ! $shop->longitude) {
+                abort(response()->json([
+                    'message' => 'Shop location is missing. Please ask the shop owner to set shop location.',
+                    'shop_id' => $shopId,
+                ], 422));
             }
-        });
 
-        return response()->json([
-            'message' => 'Product rejected.',
-            'order_item' => $orderItem->load([
-                'order.customer',
-                'product',
-            ]),
-        ]);
+            $distanceKm = $this->distanceKm(
+                (float) $shop->latitude,
+                (float) $shop->longitude,
+                $deliveryLat,
+                $deliveryLng
+            );
+
+            $fee = max($minimumFeePerShop, $baseFee + ($distanceKm * $pricePerKm));
+
+            $distanceKm = round($distanceKm, 2);
+            $fee = round($fee, 2);
+
+            $totalDistance += $distanceKm;
+            $totalFee += $fee;
+
+            $details[] = [
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->shop_name,
+                'shop_latitude' => $shop->latitude,
+                'shop_longitude' => $shop->longitude,
+                'distance_km' => $distanceKm,
+                'delivery_fee' => $fee,
+            ];
+        }
+
+        return [
+            'distance_km' => round($totalDistance, 2),
+            'fee' => round($totalFee, 2),
+            'details' => $details,
+        ];
     }
 
-    public function readyItem(Request $request, OrderItem $orderItem)
+    private function distanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
-        $shop = $request->user()->shop;
+        $earthRadius = 6371;
 
-        if (! $shop || $orderItem->shop_id !== $shop->id) {
-            return response()->json([
-                'message' => 'Unauthorized.',
-            ], 403);
-        }
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
 
-        $order = $orderItem->order;
+        $a = sin($dLat / 2) * sin($dLat / 2)
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+            * sin($dLng / 2) * sin($dLng / 2);
 
-        if (! $order) {
-            return response()->json([
-                'message' => 'Order not found.',
-            ], 404);
-        }
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
-        if ($order->order_type !== 'pickup') {
-            return response()->json([
-                'message' => 'Ready action is only used for pickup orders.',
-            ], 422);
-        }
-
-        if (in_array($order->status, ['cancelled', 'delivered', 'completed', 'in_transit'])) {
-            return response()->json([
-                'message' => 'This product can no longer be marked ready.',
-            ], 422);
-        }
-
-        if ($orderItem->status === 'rejected') {
-            return response()->json([
-                'message' => 'Rejected products cannot be marked ready.',
-            ], 422);
-        }
-
-        $orderItem->update([
-            'status' => 'ready',
-        ]);
-
-        $this->refreshOrderStatus($order);
-
-        return response()->json([
-            'message' => 'Product marked ready for pickup.',
-            'order_item' => $orderItem->load(['order.customer', 'product']),
-        ]);
-    }
-
-    private function refreshOrderStatus(Order $order): void
-    {
-        $order->load(['items', 'deliveries']);
-
-        $items = $order->items;
-
-        if ($items->isEmpty()) {
-            $order->update([
-                'status' => 'pending',
-                'total' => 0,
-            ]);
-
-            return;
-        }
-
-        $activeItems = $items->where('status', '!=', 'rejected');
-        $hasRejected = $items->contains('status', 'rejected');
-
-        if ($activeItems->isEmpty()) {
-            $order->update([
-                'status' => 'cancelled',
-                'total' => 0,
-            ]);
-
-            $order->deliveries()->update([
-                'status' => 'cancelled',
-            ]);
-
-            return;
-        }
-
-        $activeTotal = $activeItems->sum('total');
-
-        if (in_array($order->status, ['ready_for_delivery', 'in_transit', 'delivered'])) {
-            $order->update([
-                'total' => $activeTotal,
-            ]);
-
-            return;
-        }
-
-        if ($order->order_type === 'pickup') {
-            $allReady = $activeItems->every(fn ($item) => $item->status === 'ready');
-
-            $order->update([
-                'status' => $allReady ? 'completed' : ($hasRejected ? 'partially_rejected' : 'accepted'),
-                'total' => $activeTotal,
-            ]);
-
-            return;
-        }
-
-        $order->update([
-            'status' => $hasRejected ? 'partially_rejected' : 'pending',
-            'total' => $activeTotal,
-        ]);
+        return $earthRadius * $c;
     }
 
     private function createDeliveryTasksForOrder(Order $order): void
     {
-        $order->load(['items.shop', 'items.product', 'customer']);
+        $order->load([
+            'items.shop',
+            'items.product',
+            'items.productSize',
+        ]);
 
-        $activeItemsByShop = $order->items
-            ->where('status', '!=', 'rejected')
-            ->groupBy('shop_id');
+        $activeItems = $order->items->where('status', '!=', 'rejected');
+        $shopGroups = $activeItems->groupBy('shop_id');
 
-        foreach ($activeItemsByShop as $shopId => $items) {
+        foreach ($shopGroups as $shopId => $items) {
             $shop = $items->first()->shop;
 
             if (! $shop) {
                 continue;
             }
 
-            $delivery = Delivery::firstOrCreate(
+            $delivery = Delivery::updateOrCreate(
                 [
                     'order_id' => $order->id,
-                    'shop_id' => $shopId,
+                    'shop_id' => $shop->id,
                 ],
                 [
                     'driver_id' => null,
-                    'status' => 'pending',
-                    'pickup_location' => $shop->address ?? $shop->shop_name ?? 'Shop',
+                    'status' => 'available',
+                    'pickup_location' => $shop->address,
+                    'pickup_lat' => $shop->latitude,
+                    'pickup_lng' => $shop->longitude,
+                    'current_lat' => null,
+                    'current_lng' => null,
                     'delivery_location' => $order->delivery_address,
-                    'notes' => 'Auto-created from customer checkout.',
+                    'delivery_lat' => $order->delivery_lat,
+                    'delivery_lng' => $order->delivery_lng,
+                    'estimated_time' => null,
+                    'started_at' => null,
+                    'picked_up_at' => null,
+                    'completed_at' => null,
+                    'notes' => null,
                 ]
             );
 
-            foreach ($items as $orderItem) {
-                DeliveryItem::firstOrCreate([
+            DeliveryItem::where('delivery_id', $delivery->id)->delete();
+
+            foreach ($items as $item) {
+                DeliveryItem::create([
                     'delivery_id' => $delivery->id,
-                    'order_item_id' => $orderItem->id,
+                    'order_item_id' => $item->id,
                 ]);
             }
         }
-    }
-
-    private function removeRejectedItemFromDelivery(OrderItem $orderItem): void
-    {
-        DeliveryItem::where('order_item_id', $orderItem->id)->delete();
-
-        $order = $orderItem->order;
-
-        if (! $order) {
-            return;
-        }
-
-        $order->load(['items', 'deliveries.orderItems']);
-
-        foreach ($order->deliveries as $delivery) {
-            if ($delivery->orderItems->isEmpty()) {
-                $delivery->update([
-                    'status' => 'cancelled',
-                    'notes' => trim(($delivery->notes ?? '') . ' Cancelled because all items from this shop were rejected.'),
-                ]);
-            }
-        }
-
-        $order->update([
-            'total' => $order->items
-                ->where('status', '!=', 'rejected')
-                ->sum('total'),
-        ]);
     }
 }
