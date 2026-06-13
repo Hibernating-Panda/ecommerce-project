@@ -26,6 +26,12 @@ const defaultModal = {
   form: null,
   preview: null,
   payment: null,
+  qr_image: null,
+  qr_string: null,
+  deeplink: null,
+  app_store: null,
+  play_store: null,
+  mode: "simulation",
 };
 
 const CustomerOrdersPage = () => {
@@ -53,6 +59,64 @@ const CustomerOrdersPage = () => {
   useEffect(() => {
     fetchPageData();
   }, []);
+
+  useEffect(() => {
+    if (!abaModal.show || abaModal.mode !== "payway" || !abaModal.order?.id) {
+      return;
+    }
+
+    let checkCount = 0;
+    let errorCount = 0;
+    const maxChecks = 100;
+    const maxErrors = 5;
+
+    setCheckingPayment(true);
+
+    const timer = setInterval(async () => {
+      try {
+        checkCount += 1;
+
+        const res = await api.get(`/orders/${abaModal.order.id}/payway/check`);
+
+        errorCount = 0;
+
+        setAbaModal((prev) => ({
+          ...prev,
+          payment: res.data.payment || prev.payment,
+        }));
+
+        if (res.data.paid) {
+          clearInterval(timer);
+          setCheckingPayment(false);
+          showMessage("Payment successful.");
+          resetAbaModal();
+          fetchOrders();
+          return;
+        }
+
+        if (checkCount >= maxChecks) {
+          clearInterval(timer);
+          setCheckingPayment(false);
+          showMessage("Payment check timed out. You can click Check Payment manually.");
+        }
+      } catch (error) {
+        errorCount += 1;
+
+        console.error("Auto PayWay check error:", error.response?.data || error);
+
+        if (errorCount >= maxErrors) {
+          clearInterval(timer);
+          setCheckingPayment(false);
+          showMessage("Auto payment check stopped because of server error.");
+        }
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(timer);
+      setCheckingPayment(false);
+    };
+  }, [abaModal.show, abaModal.mode, abaModal.order?.id]);
 
   const showMessage = (text) => {
     setMessage(text);
@@ -287,12 +351,37 @@ const CustomerOrdersPage = () => {
         delivery_lng: form.delivery_lng,
       });
 
+      const paymentMode = import.meta.env.VITE_PAYMENT_MODE || "simulation";
+
+      if (paymentMode === "payway") {
+        const paywayRes = await api.post(`/orders/${orderId}/payway/checkout`);
+
+        setAbaModal({
+          show: true,
+          order: checkoutRes.data.order,
+          form,
+          preview,
+          payment: paywayRes.data.payment,
+          qr_image: paywayRes.data.qr_image,
+          qr_string: paywayRes.data.qr_string,
+          deeplink: paywayRes.data.deeplink,
+          app_store: paywayRes.data.app_store,
+          play_store: paywayRes.data.play_store,
+          mode: "payway",
+        });
+
+        showMessage("ABA PayWay QR created.");
+        fetchOrders();
+        return;
+      }
+
       setAbaModal({
         show: true,
         order: checkoutRes.data.order,
         form,
         preview,
         payment: checkoutRes.data.order?.payment || null,
+        mode: "simulation",
       });
 
       showMessage("Online payment simulation started.");
@@ -302,10 +391,41 @@ const CustomerOrdersPage = () => {
 
       showMessage(
         error.response?.data?.message ||
-          "Failed to start online payment simulation."
+          error.response?.data?.payway_response?.status?.message ||
+          "Failed to start online payment."
       );
     } finally {
       setCheckingOut(false);
+    }
+  };
+
+  const checkPaywayPayment = async () => {
+    if (!abaModal.order?.id) return;
+
+    setCheckingPayment(true);
+
+    try {
+      const res = await api.get(`/orders/${abaModal.order.id}/payway/check`);
+
+      setAbaModal((prev) => ({
+        ...prev,
+        payment: res.data.payment || prev.payment,
+      }));
+
+      if (res.data.paid) {
+        showMessage("Payment successful.");
+        resetAbaModal();
+        fetchOrders();
+      } else {
+        showMessage("Payment is still pending. Auto-check is still running.");
+      }
+    } catch (error) {
+      console.error("Check PayWay payment error:", error.response?.data || error);
+      showMessage(
+        error.response?.data?.message || "Failed to check payment status."
+      );
+    } finally {
+      setCheckingPayment(false);
     }
   };
 
@@ -320,7 +440,6 @@ const CustomerOrdersPage = () => {
       );
 
       showMessage(res.data.message || "Payment simulated successfully.");
-
       resetAbaModal();
       fetchOrders();
     } catch (error) {
@@ -371,9 +490,19 @@ const CustomerOrdersPage = () => {
   };
 
   const canCancel = (order) => {
-    return !["cancelled", "in_transit", "delivered", "completed"].includes(
-      order.status
-    );
+    const paymentStatus = order.payment?.status;
+
+    if (paymentStatus === "paid") {
+      return false;
+    }
+
+    return ![
+      "cancelled",
+      "ready_for_delivery",
+      "in_transit",
+      "delivered",
+      "completed",
+    ].includes(order.status);
   };
 
   const canTrackDelivery = (order) => {
@@ -449,10 +578,16 @@ const CustomerOrdersPage = () => {
           <div style={styles.paymentModal}>
             <div style={styles.modalHeader}>
               <div>
-                <h2 style={styles.modalTitle}>Online Payment Simulation</h2>
+                <h2 style={styles.modalTitle}>
+                  {abaModal.mode === "payway"
+                    ? "Pay with ABA PayWay"
+                    : "Online Payment Simulation"}
+                </h2>
+
                 <p style={styles.modalSubtitle}>
-                  This simulates ABA PayWay payment while waiting for domain
-                  whitelisting.
+                  {abaModal.mode === "payway"
+                    ? "Scan the QR using ABA Mobile or another KHQR-supported banking app."
+                    : "This simulates ABA PayWay payment while waiting for real payment setup."}
                 </p>
               </div>
 
@@ -495,69 +630,138 @@ const CustomerOrdersPage = () => {
               </div>
             </div>
 
-            <div style={styles.paywayInfoOnly}>
-              <h3 style={styles.paywayTitle}>Simulated Online Payment</h3>
+            {abaModal.mode === "payway" ? (
+              <div style={styles.paywayInfoOnly}>
+                <h3 style={styles.paywayTitle}>Scan ABA PayWay QR</h3>
 
-              <p style={styles.paywayText}>
-                Order: <strong>#{abaModal.order?.id}</strong>
-              </p>
+                {abaModal.qr_image ? (
+                  <img
+                    src={abaModal.qr_image}
+                    alt="ABA PayWay QR"
+                    style={styles.qrImage}
+                  />
+                ) : (
+                  <p style={styles.paywayText}>QR image not found.</p>
+                )}
 
-              <p style={styles.paywayText}>
-                Provider: <strong>ABA PayWay Simulation</strong>
-              </p>
-
-              <p style={styles.paywayText}>
-                Status:{" "}
-                <strong>
-                  {abaModal.payment?.status
-                    ? formatStatus(abaModal.payment.status)
-                    : "Pending"}
-                </strong>
-              </p>
-
-              {abaModal.payment?.transaction_id && (
                 <p style={styles.paywayText}>
-                  Transaction ID:{" "}
-                  <strong>{abaModal.payment.transaction_id}</strong>
+                  Order: <strong>#{abaModal.order?.id}</strong>
                 </p>
-              )}
 
-              <div style={styles.paymentSteps}>
-                <strong>Demo Steps:</strong>
-                <ol>
-                  <li>Customer chooses online payment.</li>
-                  <li>System creates a pending payment record.</li>
-                  <li>Click success to simulate PayWay confirmation.</li>
-                  <li>Payment status becomes paid.</li>
-                </ol>
+                <p style={styles.paywayText}>
+                  Provider: <strong>ABA PayWay</strong>
+                </p>
+
+                <p style={styles.paywayText}>
+                  Status:{" "}
+                  <strong>
+                    {abaModal.payment?.status
+                      ? formatStatus(abaModal.payment.status)
+                      : "Pending"}
+                  </strong>
+                </p>
+
+                {abaModal.payment?.transaction_id && (
+                  <p style={styles.paywayText}>
+                    Transaction ID:{" "}
+                    <strong>{abaModal.payment.transaction_id}</strong>
+                  </p>
+                )}
+
+                {abaModal.deeplink && (
+                  <a
+                    href={abaModal.deeplink}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.openAbaButton}
+                  >
+                    Open ABA Mobile
+                  </a>
+                )}
+
+                <div style={styles.paymentSteps}>
+                  <strong>Payment Steps:</strong>
+                  <ol>
+                    <li>Scan the QR code with ABA Mobile or a KHQR-supported app.</li>
+                    <li>Complete payment in your banking app.</li>
+                    <li>After successful payment, this popup will close automatically.</li>
+                  </ol>
+                </div>
+
+                {abaModal.qr_string && (
+                  <details style={styles.qrDetails}>
+                    <summary>Show QR String</summary>
+                    <p style={styles.qrString}>{abaModal.qr_string}</p>
+                  </details>
+                )}
               </div>
+            ) : (
+              <div style={styles.paywayInfoOnly}>
+                <h3 style={styles.paywayTitle}>Simulated Online Payment</h3>
 
-              <div style={styles.simulationActions}>
-                <button
-                  type="button"
-                  style={{
-                    ...styles.simSuccessButton,
-                    opacity: checkingPayment ? 0.7 : 1,
-                  }}
-                  disabled={checkingPayment}
-                  onClick={simulatePaymentSuccess}
-                >
-                  {checkingPayment ? "Processing..." : "Simulate Payment Success"}
-                </button>
+                <p style={styles.paywayText}>
+                  Order: <strong>#{abaModal.order?.id}</strong>
+                </p>
 
-                <button
-                  type="button"
-                  style={{
-                    ...styles.simFailedButton,
-                    opacity: checkingPayment ? 0.7 : 1,
-                  }}
-                  disabled={checkingPayment}
-                  onClick={simulatePaymentFailed}
-                >
-                  Simulate Payment Failed
-                </button>
+                <p style={styles.paywayText}>
+                  Provider: <strong>ABA PayWay Simulation</strong>
+                </p>
+
+                <p style={styles.paywayText}>
+                  Status:{" "}
+                  <strong>
+                    {abaModal.payment?.status
+                      ? formatStatus(abaModal.payment.status)
+                      : "Pending"}
+                  </strong>
+                </p>
+
+                {abaModal.payment?.transaction_id && (
+                  <p style={styles.paywayText}>
+                    Transaction ID:{" "}
+                    <strong>{abaModal.payment.transaction_id}</strong>
+                  </p>
+                )}
+
+                <div style={styles.paymentSteps}>
+                  <strong>Demo Steps:</strong>
+                  <ol>
+                    <li>Customer chooses online payment.</li>
+                    <li>System creates a pending payment record.</li>
+                    <li>Click success to simulate PayWay confirmation.</li>
+                    <li>Payment status becomes paid.</li>
+                  </ol>
+                </div>
+
+                <div style={styles.simulationActions}>
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.simSuccessButton,
+                      opacity: checkingPayment ? 0.7 : 1,
+                    }}
+                    disabled={checkingPayment}
+                    onClick={simulatePaymentSuccess}
+                  >
+                    {checkingPayment
+                      ? "Processing..."
+                      : "Simulate Payment Success"}
+                  </button>
+
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.simFailedButton,
+                      opacity: checkingPayment ? 0.7 : 1,
+                    }}
+                    disabled={checkingPayment}
+                    onClick={simulatePaymentFailed}
+                  >
+                    Simulate Payment Failed
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div style={styles.modalActions}>
               <button
@@ -567,6 +771,20 @@ const CustomerOrdersPage = () => {
               >
                 Close
               </button>
+
+              {abaModal.mode === "payway" && (
+                <button
+                  type="button"
+                  style={{
+                    ...styles.checkPaymentButton,
+                    opacity: checkingPayment ? 0.7 : 1,
+                  }}
+                  disabled={checkingPayment}
+                  onClick={checkPaywayPayment}
+                >
+                  {checkingPayment ? "Checking..." : "Check Payment"}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1222,6 +1440,46 @@ const styles = {
     margin: "6px 0",
     color: COLORS.muted,
     overflowWrap: "anywhere",
+  },
+
+  qrImage: {
+    width: 260,
+    height: 260,
+    objectFit: "contain",
+    display: "block",
+    margin: "12px auto",
+    border: `1px solid ${COLORS.border}`,
+    borderRadius: 16,
+    background: COLORS.white,
+    padding: 10,
+  },
+
+  openAbaButton: {
+    display: "inline-block",
+    marginTop: 10,
+    background: COLORS.primary,
+    color: COLORS.white,
+    textDecoration: "none",
+    border: "none",
+    padding: "11px 16px",
+    borderRadius: 12,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  qrDetails: {
+    marginTop: 12,
+    color: COLORS.dark,
+  },
+
+  qrString: {
+    wordBreak: "break-all",
+    fontSize: 12,
+    color: COLORS.muted,
+    background: COLORS.white,
+    padding: 10,
+    borderRadius: 10,
+    border: `1px solid ${COLORS.softBorder}`,
   },
 
   paymentSteps: {

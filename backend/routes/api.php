@@ -60,10 +60,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/cart/{cartItem}', [CartController::class, 'update']);
     Route::delete('/cart/{cartItem}', [CartController::class, 'destroy']);
 
+    Route::post('/orders/{order}/payway/checkout', [PayWayPaymentController::class, 'createCheckout']);
     Route::put('/orders/{order}/simulate-payment-success', [PayWayPaymentController::class, 'simulateSuccess']);
     Route::put('/orders/{order}/simulate-payment-failed', [PayWayPaymentController::class, 'simulateFailed']);
-    Route::post('/orders/{order}/payway/checkout', [PayWayPaymentController::class, 'createCheckout']);
-    Route::get('/orders/{order}/payway/check', [PayWayPaymentController::class, 'check']);
     Route::get('/orders/{order}/payway/check', [PayWayPaymentController::class, 'check']);
     Route::get('/customer/orders/{order}/track', [CartOrderController::class, 'trackDelivery']);
     Route::get('/customer/orders', [CartOrderController::class, 'customerIndex']);

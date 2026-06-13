@@ -148,9 +148,23 @@ class OrderController extends Controller
             ], 403);
         }
 
-        if (in_array($order->status, ['delivered', 'completed', 'in_transit'])) {
+        $order->loadMissing('payment');
+
+        if ($order->payment && $order->payment->status === 'paid') {
             return response()->json([
-                'message' => 'This order can no longer be cancelled.',
+                'message' => 'This order has already been paid. Please contact support or admin for cancellation/refund.',
+            ], 422);
+        }
+
+        if (in_array($order->status, [
+            'ready_for_delivery',
+            'in_transit',
+            'delivered',
+            'completed',
+            'cancelled',
+        ])) {
+            return response()->json([
+                'message' => 'This order can no longer be cancelled at this stage.',
             ], 422);
         }
 
@@ -281,7 +295,13 @@ class OrderController extends Controller
             ], 422);
         }
 
-        if ($order->order_type && (float) $order->total > 0 && $order->payment_method) {
+        if ($order->payment && $order->payment->status === 'paid') {
+            return response()->json([
+                'message' => 'This order has already been paid.',
+            ], 422);
+        }
+
+        if ($order->order_type && $order->total > 0) {
             return response()->json([
                 'message' => 'This order has already been checked out.',
             ], 422);
@@ -319,10 +339,6 @@ class OrderController extends Controller
             $deliveryDistanceKm,
             $deliveryFee
         ) {
-            $paymentMethod = $validated['order_type'] === 'delivery'
-                ? $validated['payment_method']
-                : 'cash';
-
             $order->update([
                 'status' => $validated['order_type'] === 'pickup'
                     ? 'accepted'
@@ -332,7 +348,9 @@ class OrderController extends Controller
                 'delivery_fee' => $deliveryFee,
                 'total' => round($subtotal + $deliveryFee, 2),
                 'order_type' => $validated['order_type'],
-                'payment_method' => $paymentMethod,
+                'payment_method' => $validated['order_type'] === 'delivery'
+                    ? $validated['payment_method']
+                    : 'cash',
                 'pickup_date' => $validated['order_type'] === 'pickup'
                     ? $validated['pickup_date']
                     : null,
@@ -346,38 +364,6 @@ class OrderController extends Controller
                     ? $validated['delivery_lng']
                     : null,
             ]);
-
-            if ($paymentMethod === 'online') {
-                $order->payment()->updateOrCreate(
-                    [
-                        'order_id' => $order->id,
-                    ],
-                    [
-                        'customer_id' => $order->customer_id,
-                        'amount' => round($subtotal + $deliveryFee, 2),
-                        'currency' => config('payway.currency', 'USD'),
-                        'method' => 'online',
-                        'provider' => 'aba_payway',
-                        'status' => 'pending',
-                    ]
-                );
-            }
-
-            if ($paymentMethod === 'cash') {
-                $order->payment()->updateOrCreate(
-                    [
-                        'order_id' => $order->id,
-                    ],
-                    [
-                        'customer_id' => $order->customer_id,
-                        'amount' => round($subtotal + $deliveryFee, 2),
-                        'currency' => config('payway.currency', 'USD'),
-                        'method' => 'cash',
-                        'provider' => 'cash',
-                        'status' => 'pending',
-                    ]
-                );
-            }
 
             if ($validated['order_type'] === 'delivery') {
                 $this->createDeliveryTasksForOrder($order->fresh());
@@ -408,73 +394,6 @@ class OrderController extends Controller
                 'deliveries.driver',
                 'payment',
             ]),
-        ]);
-    }
-
-    public function trackDelivery(Request $request, Order $order)
-    {
-        if ($order->customer_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'Unauthorized.',
-            ], 403);
-        }
-
-        $order->load([
-            'customer',
-            'items.product',
-            'items.productSize',
-            'items.shop',
-            'deliveries.shop',
-            'deliveries.driver',
-            'deliveries.latestLocation',
-            'deliveries.orderItems.product',
-            'deliveries.orderItems.productSize',
-            'payment',
-        ]);
-
-        $delivery = $order->deliveries
-            ->whereNotIn('status', ['cancelled'])
-            ->sortByDesc('id')
-            ->first();
-
-        if (! $delivery) {
-            return response()->json([
-                'order' => $order,
-                'delivery' => null,
-                'message' => 'No delivery task has been created for this order yet.',
-            ]);
-        }
-
-        $latestLocation = $delivery->latestLocation;
-
-        $driverLat = $delivery->current_lat ?: $latestLocation?->latitude;
-        $driverLng = $delivery->current_lng ?: $latestLocation?->longitude;
-
-        return response()->json([
-            'order' => $order,
-            'delivery' => $delivery,
-            'tracking' => [
-                'status' => $delivery->status,
-                'pickup' => [
-                    'label' => 'Shop Pickup',
-                    'address' => $delivery->pickup_location,
-                    'lat' => $delivery->pickup_lat,
-                    'lng' => $delivery->pickup_lng,
-                ],
-                'destination' => [
-                    'label' => 'Customer Address',
-                    'address' => $delivery->delivery_location,
-                    'lat' => $delivery->delivery_lat,
-                    'lng' => $delivery->delivery_lng,
-                ],
-                'driver' => [
-                    'label' => $delivery->driver?->name ?? 'Delivery Man',
-                    'phone' => $delivery->driver?->phone,
-                    'lat' => $driverLat,
-                    'lng' => $driverLng,
-                    'updated_at' => $latestLocation?->timestamp ?? $delivery->updated_at,
-                ],
-            ],
         ]);
     }
 
@@ -614,27 +533,89 @@ class OrderController extends Controller
                     'pickup_location' => $shop->address,
                     'pickup_lat' => $shop->latitude,
                     'pickup_lng' => $shop->longitude,
-                    'current_lat' => null,
-                    'current_lng' => null,
                     'delivery_location' => $order->delivery_address,
                     'delivery_lat' => $order->delivery_lat,
                     'delivery_lng' => $order->delivery_lng,
-                    'estimated_time' => null,
-                    'started_at' => null,
-                    'picked_up_at' => null,
-                    'completed_at' => null,
                     'notes' => null,
                 ]
             );
 
-            DeliveryItem::where('delivery_id', $delivery->id)->delete();
+            if (class_exists(DeliveryItem::class)) {
+                DeliveryItem::where('delivery_id', $delivery->id)->delete();
 
-            foreach ($items as $item) {
-                DeliveryItem::create([
-                    'delivery_id' => $delivery->id,
-                    'order_item_id' => $item->id,
-                ]);
+                foreach ($items as $orderItem) {
+                    DeliveryItem::create([
+                        'delivery_id' => $delivery->id,
+                        'order_item_id' => $orderItem->id,
+                    ]);
+                }
             }
         }
+    }
+
+    public function trackDelivery(Request $request, Order $order)
+    {
+        if ($order->customer_id !== $request->user()->id) {
+            return response()->json([
+                'message' => 'Unauthorized.',
+            ], 403);
+        }
+
+        $order->load([
+            'customer',
+            'items.product',
+            'items.productSize',
+            'items.shop',
+            'deliveries.shop',
+            'deliveries.driver',
+            'deliveries.latestLocation',
+            'deliveries.orderItems.product',
+            'deliveries.orderItems.productSize',
+        ]);
+
+        $delivery = $order->deliveries
+            ->whereNotIn('status', ['cancelled'])
+            ->sortByDesc('id')
+            ->first();
+
+        if (! $delivery) {
+            return response()->json([
+                'order' => $order,
+                'delivery' => null,
+                'message' => 'No delivery task has been created for this order yet.',
+            ]);
+        }
+
+        $latestLocation = $delivery->latestLocation;
+
+        $driverLat = $delivery->current_lat ?: $latestLocation?->latitude;
+        $driverLng = $delivery->current_lng ?: $latestLocation?->longitude;
+
+        return response()->json([
+            'order' => $order,
+            'delivery' => $delivery,
+            'tracking' => [
+                'status' => $delivery->status,
+                'pickup' => [
+                    'label' => 'Shop Pickup',
+                    'address' => $delivery->pickup_location,
+                    'lat' => $delivery->pickup_lat,
+                    'lng' => $delivery->pickup_lng,
+                ],
+                'destination' => [
+                    'label' => 'Customer Address',
+                    'address' => $delivery->delivery_location,
+                    'lat' => $delivery->delivery_lat,
+                    'lng' => $delivery->delivery_lng,
+                ],
+                'driver' => [
+                    'label' => $delivery->driver?->name ?? 'Delivery Man',
+                    'phone' => $delivery->driver?->phone,
+                    'lat' => $driverLat,
+                    'lng' => $driverLng,
+                    'updated_at' => $latestLocation?->timestamp ?? $delivery->updated_at,
+                ],
+            ],
+        ]);
     }
 }

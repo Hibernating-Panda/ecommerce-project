@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Order;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Throwable;
 
 class PayWayService
@@ -23,7 +22,7 @@ class PayWayService
 
         $fields = [
             'req_time' => $reqTime,
-            'merchant_id' => config('payway.merchant_id'),
+            'merchant_id' => (string) config('payway.merchant_id'),
             'tran_id' => $tranId,
 
             'firstname' => $this->firstName($order->customer?->name),
@@ -34,21 +33,18 @@ class PayWayService
             'type' => '',
             'payment_option' => '',
             'items' => '',
-            'shipping' => '',
+            'shipping' => '0.00',
             'amount' => $amount,
-            'currency' => config('payway.currency', 'USD'),
+            'currency' => (string) config('payway.currency', 'USD'),
 
-            'return_url' => config('payway.return_url') ?: '',
+            'return_url' => (string) (config('payway.return_url') ?: ''),
             'cancel_url' => '',
-            'skip_success_page' => '',
             'continue_success_url' => '',
             'return_deeplink' => '',
             'custom_fields' => '',
             'return_params' => base64_encode(json_encode([
                 'order_id' => $order->id,
             ])),
-            'view_type' => '',
-            'payment_gate' => '',
             'payout' => '',
             'additional_params' => '',
             'lifetime' => '',
@@ -56,6 +52,15 @@ class PayWayService
         ];
 
         $fields['hash'] = $this->hashPurchase($fields);
+
+        Log::info('PayWay purchase form created', [
+            'order_id' => $order->id,
+            'tran_id' => $tranId,
+            'amount' => $amount,
+            'action_url' => $this->purchaseUrl(),
+            'fields_without_hash' => collect($fields)->except('hash')->toArray(),
+            'api_key_length' => strlen((string) config('payway.api_key')),
+        ]);
 
         return [
             'tran_id' => $tranId,
@@ -71,7 +76,7 @@ class PayWayService
 
             $payload = [
                 'req_time' => $reqTime,
-                'merchant_id' => config('payway.merchant_id'),
+                'merchant_id' => (string) config('payway.merchant_id'),
                 'tran_id' => $transactionId,
             ];
 
@@ -81,15 +86,26 @@ class PayWayService
 
             $response = Http::timeout(25)
                 ->acceptJson()
-                ->asJson()
+                ->asForm()
                 ->post($url, $payload);
+
+            $body = $response->body();
+            $json = $response->json();
+
+            Log::info('PayWay check transaction response', [
+                'url' => $url,
+                'status' => $response->status(),
+                'body' => $body,
+                'json' => $json,
+                'tran_id' => $transactionId,
+            ]);
 
             return [
                 'ok' => $response->successful(),
                 'payload' => $this->safePayload($payload),
-                'response' => $response->json() ?: [
+                'response' => $json ?: [
                     'http_status' => $response->status(),
-                    'raw_body' => $response->body(),
+                    'raw_body' => $body,
                 ],
             ];
         } catch (Throwable $e) {
@@ -126,14 +142,16 @@ class PayWayService
 
     private function firstName(?string $name): string
     {
-        $parts = preg_split('/\s+/', trim($name ?: 'Customer'));
+        $name = trim($name ?: 'Customer');
+        $parts = preg_split('/\s+/', $name);
 
         return $parts[0] ?? 'Customer';
     }
 
     private function lastName(?string $name): string
     {
-        $parts = preg_split('/\s+/', trim($name ?: 'User'));
+        $name = trim($name ?: 'User');
+        $parts = preg_split('/\s+/', $name);
 
         if (count($parts) <= 1) {
             return 'User';
@@ -153,32 +171,35 @@ class PayWayService
 
     private function hashPurchase(array $fields): string
     {
-        $raw = $fields['req_time']
-            . $fields['merchant_id']
-            . $fields['tran_id']
-            . $fields['firstname']
-            . $fields['lastname']
-            . $fields['email']
-            . $fields['phone']
-            . $fields['type']
-            . $fields['payment_option']
-            . $fields['items']
-            . $fields['shipping']
-            . $fields['amount']
-            . $fields['currency']
-            . $fields['return_url']
-            . $fields['cancel_url']
-            . $fields['skip_success_page']
-            . $fields['continue_success_url']
-            . $fields['return_deeplink']
-            . $fields['custom_fields']
-            . $fields['return_params']
-            . $fields['view_type']
-            . $fields['payment_gate']
-            . $fields['payout']
-            . $fields['additional_params']
-            . $fields['lifetime']
-            . $fields['google_pay_token'];
+        $raw = ($fields['req_time'] ?? '')
+            . ($fields['merchant_id'] ?? '')
+            . ($fields['tran_id'] ?? '')
+            . ($fields['amount'] ?? '')
+            . ($fields['items'] ?? '')
+            . ($fields['shipping'] ?? '')
+            . ($fields['firstname'] ?? '')
+            . ($fields['lastname'] ?? '')
+            . ($fields['email'] ?? '')
+            . ($fields['phone'] ?? '')
+            . ($fields['type'] ?? '')
+            . ($fields['payment_option'] ?? '')
+            . ($fields['return_url'] ?? '')
+            . ($fields['cancel_url'] ?? '')
+            . ($fields['continue_success_url'] ?? '')
+            . ($fields['return_deeplink'] ?? '')
+            . ($fields['currency'] ?? '')
+            . ($fields['custom_fields'] ?? '')
+            . ($fields['return_params'] ?? '')
+            . ($fields['payout'] ?? '')
+            . ($fields['lifetime'] ?? '')
+            . ($fields['additional_params'] ?? '')
+            . ($fields['google_pay_token'] ?? '');
+
+        Log::info('PayWay purchase hash debug', [
+            'raw' => $raw,
+            'raw_length' => strlen($raw),
+            'api_key_length' => strlen((string) config('payway.api_key')),
+        ]);
 
         return base64_encode(
             hash_hmac('sha512', $raw, (string) config('payway.api_key'), true)
@@ -187,9 +208,19 @@ class PayWayService
 
     private function hashCheckTransaction(array $payload): string
     {
-        $raw = $payload['req_time']
-            . $payload['merchant_id']
-            . $payload['tran_id'];
+        $hashFields = [
+            'req_time',
+            'merchant_id',
+            'tran_id',
+        ];
+ 
+        $raw = '';
+
+        foreach ($hashFields as $field) {
+            $raw .= array_key_exists($field, $payload)
+                ? (string) $payload[$field]
+                : '';
+        }
 
         return base64_encode(
             hash_hmac('sha512', $raw, (string) config('payway.api_key'), true)
@@ -201,5 +232,50 @@ class PayWayService
         unset($payload['hash']);
 
         return $payload;
+    }
+
+    public function createPurchase(Order $order): array
+    {
+        try {
+            $checkout = $this->createPurchaseForm($order);
+
+            $response = Http::timeout(25)
+                ->asForm()
+                ->post($checkout['action_url'], $checkout['fields']);
+
+            $body = $response->body();
+            $json = $response->json();
+
+            Log::info('PayWay purchase response', [
+                'status' => $response->status(),
+                'body' => $body,
+                'json' => $json,
+                'tran_id' => $checkout['tran_id'],
+            ]);
+
+            return [
+                'ok' => $response->successful()
+                    && data_get($json, 'status.code') === '00',
+                'tran_id' => $checkout['tran_id'],
+                'fields' => $checkout['fields'],
+                'response' => $json ?: [
+                    'http_status' => $response->status(),
+                    'raw_body' => $body,
+                ],
+            ];
+        } catch (Throwable $e) {
+            Log::error('PayWay purchase exception', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'ok' => false,
+                'tran_id' => null,
+                'fields' => [],
+                'response' => [
+                    'exception' => $e->getMessage(),
+                ],
+            ];
+        }
     }
 }

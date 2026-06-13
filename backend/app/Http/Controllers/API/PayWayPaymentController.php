@@ -50,7 +50,15 @@ class PayWayPaymentController extends Controller
             ]);
         }
 
-        $checkout = $payWay->createPurchaseForm($order);
+        $checkout = $payWay->createPurchase($order);
+        $paywayResponse = $checkout['response'];
+
+        if (! $checkout['ok']) {
+            return response()->json([
+                'message' => 'Failed to create ABA PayWay QR.',
+                'payway_response' => $paywayResponse,
+            ], 422);
+        }
 
         $payment = Payment::updateOrCreate(
             [
@@ -65,19 +73,22 @@ class PayWayPaymentController extends Controller
                 'status' => 'pending',
                 'transaction_id' => $checkout['tran_id'],
                 'merchant_reference' => $checkout['tran_id'],
-                'response' => [
-                    'checkout_type' => 'ecommerce_purchase',
-                    'action_url' => $checkout['action_url'],
-                    'fields' => collect($checkout['fields'])->except('hash')->toArray(),
-                ],
+                'qr_string' => $paywayResponse['qrString'] ?? null,
+                'qr_image' => $paywayResponse['qrImage'] ?? null,
+                'deeplink' => $paywayResponse['abapay_deeplink'] ?? null,
+                'response' => $paywayResponse,
             ]
         );
 
         return response()->json([
-            'message' => 'ABA PayWay checkout created.',
+            'message' => 'ABA PayWay QR created.',
             'payment' => $payment,
-            'action_url' => $checkout['action_url'],
-            'fields' => $checkout['fields'],
+            'qr_string' => $paywayResponse['qrString'] ?? null,
+            'qr_image' => $paywayResponse['qrImage'] ?? null,
+            'deeplink' => $paywayResponse['abapay_deeplink'] ?? null,
+            'app_store' => $paywayResponse['app_store'] ?? null,
+            'play_store' => $paywayResponse['play_store'] ?? null,
+            'payway_response' => $paywayResponse,
         ]);
     }
 
@@ -99,7 +110,6 @@ class PayWayPaymentController extends Controller
 
         $result = $payWay->checkTransaction($payment->transaction_id);
         $response = $result['response'];
-
         $isPaid = $this->isApproved($response);
 
         DB::transaction(function () use ($payment, $order, $response, $isPaid) {
@@ -169,21 +179,6 @@ class PayWayPaymentController extends Controller
         return response()->json([
             'message' => 'Callback received.',
         ]);
-    }
-
-    private function isApproved($response): bool
-    {
-        $status = data_get($response, 'status');
-        $statusCode = data_get($response, 'data.payment_status_code');
-        $paymentStatus = data_get($response, 'data.payment_status');
-        $code = data_get($response, 'status.code');
-        $message = data_get($response, 'status.message');
-
-        return (string) $status === '0'
-            || (string) $statusCode === '0'
-            || strtoupper((string) $paymentStatus) === 'APPROVED'
-            || (string) $code === '00'
-            || strtolower((string) $message) === 'approved';
     }
 
     public function simulateSuccess(Request $request, Order $order)
@@ -277,5 +272,50 @@ class PayWayPaymentController extends Controller
             'payment' => $payment->fresh(),
             'paid' => false,
         ]);
+    }
+
+    private function isApproved($response): bool
+    {
+        $paymentStatus = strtoupper($this->safeText(data_get($response, 'data.payment_status')));
+        $paymentStatusCode = $this->safeText(data_get($response, 'data.payment_status_code'));
+
+        $transactionStatus = strtoupper($this->safeText(data_get($response, 'data.transaction_status')));
+        $transactionStatusCode = $this->safeText(data_get($response, 'data.transaction_status_code'));
+
+        $statusText = strtoupper($this->safeText(data_get($response, 'payment_status')));
+        $statusCode = $this->safeText(data_get($response, 'payment_status_code'));
+
+        $tranStatus = strtoupper($this->safeText(data_get($response, 'transaction_status')));
+        $tranStatusCode = $this->safeText(data_get($response, 'transaction_status_code'));
+
+        return $paymentStatus === 'APPROVED'
+            || $paymentStatus === 'PAID'
+            || $paymentStatus === 'SUCCESS'
+            || $transactionStatus === 'APPROVED'
+            || $transactionStatus === 'PAID'
+            || $transactionStatus === 'SUCCESS'
+            || $statusText === 'APPROVED'
+            || $statusText === 'PAID'
+            || $statusText === 'SUCCESS'
+            || $tranStatus === 'APPROVED'
+            || $tranStatus === 'PAID'
+            || $tranStatus === 'SUCCESS'
+            || $paymentStatusCode === '0'
+            || $paymentStatusCode === '00'
+            || $transactionStatusCode === '0'
+            || $transactionStatusCode === '00'
+            || $statusCode === '0'
+            || $statusCode === '00'
+            || $tranStatusCode === '0'
+            || $tranStatusCode === '00';
+    }
+
+    private function safeText($value): string
+    {
+        if (is_array($value) || is_object($value)) {
+            return json_encode($value);
+        }
+
+        return trim((string) $value);
     }
 }
